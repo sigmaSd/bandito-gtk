@@ -1,11 +1,6 @@
 {
-  "vendor": true,
-  "tasks": {
-    "dev": "deno run -A --unstable-ffi --watch main.ts",
-    "lint": "deno lint"
-  },
   "imports": {
-    "@sigmasd/gtk": "jsr:@sigmasd/gtk@^0.26.0",
+    "@sigmasd/gtk": "jsr:@sigmasd/gtk@^0.27.0",
     "@std/assert": "jsr:@std/assert@^1.0.17",
     "@std/fmt": "jsr:@std/fmt@^1.0.9",
     "@std/fs": "jsr:@std/fs@^1.0.22",
