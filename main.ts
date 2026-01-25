@@ -4,15 +4,22 @@ import {
   ApplicationWindow,
   Box,
   Button,
-  CheckButton,
+  CssProvider,
+  Display,
   DropDown,
   Entry,
+  HeaderBar,
   Label,
   ListBox,
   Orientation,
   ProgressBar,
   ScrolledWindow,
+  SizeGroup,
+  SizeGroupMode,
   StringList,
+  StyleContext,
+  StyleProviderPriority,
+  Switch,
 } from "@sigmasd/gtk/gtk4";
 import { EventLoop } from "@sigmasd/gtk/eventloop";
 import { ElTrafico } from "./eltrafico/eltrafico.ts";
@@ -31,6 +38,14 @@ let eltrafico: ElTrafico;
 let listBox: ListBox;
 const appsMap = new Map<string, AppRow>();
 
+// SizeGroups for perfect column alignment
+const sgName = new SizeGroup(SizeGroupMode.HORIZONTAL);
+const sgDlRate = new SizeGroup(SizeGroupMode.HORIZONTAL);
+const sgUlRate = new SizeGroup(SizeGroupMode.HORIZONTAL);
+const sgDlLimit = new SizeGroup(SizeGroupMode.HORIZONTAL);
+const sgUlLimit = new SizeGroup(SizeGroupMode.HORIZONTAL);
+const sgActive = new SizeGroup(SizeGroupMode.HORIZONTAL);
+
 class AppRow {
   box: Box;
   nameLabel: Label;
@@ -40,35 +55,53 @@ class AppRow {
   dlLimitUnit: DropDown;
   ulLimitEntry: Entry;
   ulLimitUnit: DropDown;
-  activeCheck: CheckButton;
+  activeSwitch: Switch;
+  private debounceTimer: number | null = null;
 
   constructor(public name: string, public isGlobal: boolean = false) {
     this.box = new Box(Orientation.HORIZONTAL, 10);
-    this.box.setMarginTop(5);
-    this.box.setMarginBottom(5);
-    this.box.setMarginStart(10);
-    this.box.setMarginEnd(10);
+    this.box.setMarginTop(2);
+    this.box.setMarginBottom(2);
+    this.box.setMarginStart(12);
+    this.box.setMarginEnd(12);
+    this.box.addCssClass("app-row");
+    if (isGlobal) {
+      this.box.addCssClass("global-row");
+    }
 
-    this.nameLabel = new Label(isGlobal ? "Global" : name);
+    this.nameLabel = new Label(isGlobal ? "GLOBAL" : name);
     this.nameLabel.setHalign(Align.START);
-    this.nameLabel.setSizeRequest(200, -1);
+    this.nameLabel.setSizeRequest(280, -1);
     this.nameLabel.setEllipsize(3); // PANGO_ELLIPSIZE_END
+    this.nameLabel.addCssClass("app-name");
+    sgName.addWidget(this.nameLabel);
     this.box.append(this.nameLabel);
 
     this.dlRateLabel = new Label("__");
-    this.dlRateLabel.setSizeRequest(100, -1);
-    this.dlRateLabel.setXalign(0.5);
+    this.dlRateLabel.setXalign(1.0);
+    this.dlRateLabel.setSizeRequest(120, -1);
+    this.dlRateLabel.setEllipsize(3);
+    this.dlRateLabel.addCssClass("rate-label");
+    this.dlRateLabel.addCssClass("dl-rate");
+    sgDlRate.addWidget(this.dlRateLabel);
     this.box.append(this.dlRateLabel);
 
     this.ulRateLabel = new Label("__");
-    this.ulRateLabel.setSizeRequest(100, -1);
-    this.ulRateLabel.setXalign(0.5);
+    this.ulRateLabel.setXalign(1.0);
+    this.ulRateLabel.setSizeRequest(120, -1);
+    this.ulRateLabel.setEllipsize(3);
+    this.ulRateLabel.addCssClass("rate-label");
+    this.ulRateLabel.addCssClass("ul-rate");
+    this.ulRateLabel.setMarginEnd(15); // Extra space before limits
+    sgUlRate.addWidget(this.ulRateLabel);
     this.box.append(this.ulRateLabel);
 
-    const dlLimitBox = new Box(Orientation.HORIZONTAL, 2);
-    dlLimitBox.setSizeRequest(120, -1);
+    const dlLimitBox = new Box(Orientation.HORIZONTAL, 0);
+    dlLimitBox.addCssClass("limit-box");
+    dlLimitBox.setSizeRequest(140, -1);
     this.dlLimitEntry = new Entry();
-    this.dlLimitEntry.setText("450");
+    this.dlLimitEntry.setText("100");
+    this.dlLimitEntry.addCssClass("limit-entry");
     this.dlLimitEntry.setHexpand(true);
     dlLimitBox.append(this.dlLimitEntry);
 
@@ -76,13 +109,17 @@ class AppRow {
     ["bps", "kbps", "mbps"].forEach((u) => unitsDl.append(u));
     this.dlLimitUnit = new DropDown(unitsDl);
     this.dlLimitUnit.setSelected(1); // kbps
+    this.dlLimitUnit.addCssClass("limit-unit");
     dlLimitBox.append(this.dlLimitUnit);
+    sgDlLimit.addWidget(dlLimitBox);
     this.box.append(dlLimitBox);
 
-    const ulLimitBox = new Box(Orientation.HORIZONTAL, 2);
-    ulLimitBox.setSizeRequest(120, -1);
+    const ulLimitBox = new Box(Orientation.HORIZONTAL, 0);
+    ulLimitBox.addCssClass("limit-box");
+    ulLimitBox.setSizeRequest(140, -1);
     this.ulLimitEntry = new Entry();
-    this.ulLimitEntry.setText("450");
+    this.ulLimitEntry.setText("100");
+    this.ulLimitEntry.addCssClass("limit-entry");
     this.ulLimitEntry.setHexpand(true);
     ulLimitBox.append(this.ulLimitEntry);
 
@@ -90,31 +127,42 @@ class AppRow {
     ["bps", "kbps", "mbps"].forEach((u) => unitsUl.append(u));
     this.ulLimitUnit = new DropDown(unitsUl);
     this.ulLimitUnit.setSelected(1); // kbps
+    this.ulLimitUnit.addCssClass("limit-unit");
     ulLimitBox.append(this.ulLimitUnit);
+    sgUlLimit.addWidget(ulLimitBox);
     this.box.append(ulLimitBox);
 
-    this.activeCheck = new CheckButton();
-    this.activeCheck.setSizeRequest(50, -1);
-    this.activeCheck.setHalign(Align.CENTER);
-    this.box.append(this.activeCheck);
+    this.activeSwitch = new Switch();
+    this.activeSwitch.setValign(Align.CENTER);
+    this.activeSwitch.setHalign(Align.CENTER);
+    sgActive.addWidget(this.activeSwitch);
+    this.box.append(this.activeSwitch);
 
-    this.activeCheck.onToggled(() => this.updateLimit());
+    this.activeSwitch.onActivate(() => this.updateLimitDebounced());
     this.dlLimitEntry.onChanged(() => {
-      if (this.activeCheck.getActive()) this.updateLimit();
+      if (this.activeSwitch.getActive()) this.updateLimitDebounced();
     });
     this.ulLimitEntry.onChanged(() => {
-      if (this.activeCheck.getActive()) this.updateLimit();
+      if (this.activeSwitch.getActive()) this.updateLimitDebounced();
     });
     this.dlLimitUnit.onSelectedChanged(() => {
-      if (this.activeCheck.getActive()) this.updateLimit();
+      if (this.activeSwitch.getActive()) this.updateLimitDebounced();
     });
     this.ulLimitUnit.onSelectedChanged(() => {
-      if (this.activeCheck.getActive()) this.updateLimit();
+      if (this.activeSwitch.getActive()) this.updateLimitDebounced();
     });
   }
 
+  updateLimitDebounced() {
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(() => {
+      this.updateLimit();
+      this.debounceTimer = null;
+    }, 300);
+  }
+
   updateLimit() {
-    const active = this.activeCheck.getActive();
+    const active = this.activeSwitch.getActive();
     const dlValue = Number.parseFloat(this.dlLimitEntry.getText());
     const dlUnit = ["bps", "kbps", "mbps"][
       this.dlLimitUnit.getSelected()
@@ -158,12 +206,45 @@ function ensureAppRow(name: string, isGlobal = false) {
   return appRow;
 }
 
+const CSS = `
+  .app-name { font-size: 1.1rem; font-weight: bold; padding-left: 5px; }
+  .rate-label { font-family: monospace; font-size: 1.15rem; font-weight: 700; }
+  .dl-rate { color: #2ecc71; }
+  .ul-rate { color: #3498db; }
+  .header-label { font-size: 0.85rem; font-weight: bold; color: #7f8c8d; }
+  .global-row { background-color: rgba(241, 196, 15, 0.15); border-radius: 8px; }
+  .app-row { padding: 6px 0; }
+  list { background-color: transparent; margin: 10px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); }
+  row { border-bottom: 1px solid rgba(0,0,0,0.05); }
+  row:last-child { border-bottom: none; }
+  .main-container { background-color: @window_bg_color; }
+  .header-box { padding: 10px 22px; background-color: @headerbar_bg_color; border-bottom: 1px solid @headerbar_border_color; }
+
+  .limit-box { border: 1px solid rgba(0,0,0,0.15); border-radius: 6px; background: @window_bg_color; }
+  .limit-entry { border: none; background: transparent; box-shadow: none; min-height: 30px; }
+  .limit-unit { border: none; background: rgba(0,0,0,0.05); border-left: 1px solid rgba(0,0,0,0.1); border-radius: 0; }
+`;
+
 const app = new Application("com.sigmasd.bandito", 0);
 
 app.onActivate(() => {
+  const display = Display.getDefault();
+  if (display) {
+    const provider = new CssProvider();
+    provider.loadFromData(CSS);
+    StyleContext.addProviderForDisplay(
+      display,
+      provider,
+      StyleProviderPriority.APPLICATION,
+    );
+  }
+
   const window = new ApplicationWindow(app);
   window.setTitle("Bandito GTK");
-  window.setDefaultSize(800, 600);
+  window.setDefaultSize(950, 700);
+
+  const header = new HeaderBar();
+  window.setTitlebar(header);
 
   if (!userInterface) {
     const interfaces = getNetworkInterfaces();
@@ -247,28 +328,35 @@ async function buildMainUI(window: ApplicationWindow) {
   await eltrafico.interface(userInterface);
 
   const mainBox = new Box(Orientation.VERTICAL, 0);
+  mainBox.addCssClass("main-container");
 
   // Header Row
   const headerBox = new Box(Orientation.HORIZONTAL, 10);
-  headerBox.setMarginTop(10);
-  headerBox.setMarginBottom(10);
-  headerBox.setMarginStart(10);
-  headerBox.setMarginEnd(10);
+  headerBox.addCssClass("header-box");
+  headerBox.setHexpand(true);
 
   const labels = [
-    { text: "Name", align: Align.START, width: 200 },
-    { text: "DL Rate", width: 100 },
-    { text: "UL Rate", width: 100 },
-    { text: "DL Limit", width: 120 },
-    { text: "UL Limit", width: 120 },
-    { text: "Active", width: 50 },
+    { text: "NAME", align: Align.START, sg: sgName, width: 280 },
+    { text: "DL RATE", xalign: 1.0, sg: sgDlRate, width: 120 },
+    { text: "UL RATE", xalign: 1.0, sg: sgUlRate, width: 120, marginEnd: 15 },
+    { text: "DL LIMIT", sg: sgDlLimit, width: 140 },
+    { text: "UL LIMIT", sg: sgUlLimit, width: 140 },
+    { text: "ACTIVE", xalign: 0.5, sg: sgActive, width: 60 },
   ];
 
   for (const l of labels) {
-    const label = new Label(`<b>${l.text}</b>`);
-    label.setUseMarkup(true);
+    const label = new Label(l.text);
+    label.addCssClass("header-label");
     if (l.align) label.setHalign(l.align);
-    label.setSizeRequest(l.width, -1);
+    if (l.xalign !== undefined) label.setXalign(l.xalign);
+    if (l.width) {
+      label.setSizeRequest(l.width, -1);
+      label.setEllipsize(3);
+    }
+    if (l.marginEnd) {
+      label.setMarginEnd(l.marginEnd);
+    }
+    if (l.sg) l.sg.addWidget(label);
     headerBox.append(label);
   }
   mainBox.append(headerBox);
@@ -289,17 +377,18 @@ async function buildMainUI(window: ApplicationWindow) {
     (async () => {
       try {
         if (eltrafico) {
-          await eltrafico.stop();
-          // Wait up to 5 seconds for clean exit
-          const statusPromise = eltrafico.wait();
+          // Tell the loop to stop polling
+          const stopPromise = eltrafico.stop();
           const timeoutPromise = new Promise((r) =>
             setTimeout(() => r("timeout"), 5000)
           );
-          const result = await Promise.race([statusPromise, timeoutPromise]);
+          const result = await Promise.race([stopPromise, timeoutPromise]);
           if (result === "timeout") {
             console.log("Forcing eltrafico kill...");
             eltrafico.kill();
           }
+          // Wait for process to actually exit
+          await eltrafico.wait();
         }
       } catch (e) {
         console.error("Error during shutdown:", e);
@@ -309,7 +398,6 @@ async function buildMainUI(window: ApplicationWindow) {
     })();
     return false;
   });
-
   // Start discovery loop (eltrafico)
   (async () => {
     while (true) {

@@ -10,8 +10,14 @@ export function getNetworkInterfaces(): string[] {
         }
       }
     }
-    // Sort interfaces for better UX
-    return interfaces.sort();
+    // Sort interfaces for better UX, pushing tailscale to the end
+    return interfaces.sort((a, b) => {
+      const aTail = a.startsWith("tailscale");
+      const bTail = b.startsWith("tailscale");
+      if (aTail && !bTail) return 1;
+      if (!aTail && bTail) return -1;
+      return a.localeCompare(b);
+    });
   } catch (e) {
     console.error("Failed to get network interfaces:", e);
     return [];

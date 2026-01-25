@@ -2,18 +2,46 @@ import { TextDelimiterStream } from "@std/streams";
 import { getBinaryPath } from "../utils/binary_manager.ts";
 
 export async function* bandwhich(interfaceName: string) {
-  const bandwhichStream = new Deno.Command("pkexec", {
+  const command = new Deno.Command("pkexec", {
     args: [getBinaryPath("bandwhich"), "-p", "--raw", "-i", interfaceName],
     stdout: "piped",
-  }).spawn()
-    .stdout
+    stderr: "piped",
+  });
+
+  const process = command.spawn();
+  let isExited = false;
+
+  // Consume stderr
+  (async () => {
+    for await (const chunk of process.stderr) {
+      if (!isExited) {
+        await Deno.stderr.write(chunk);
+      }
+    }
+  })();
+
+  process.status.then((s) => {
+    if (!s.success) {
+      if (s.code !== 143 && s.code !== 130) { // Ignore SIGTERM/SIGINT
+        console.error("bandwhich exited with error:", s.code);
+      }
+      isExited = true;
+    }
+  });
+
+  const bandwhichStream = process.stdout
     .pipeThrough(new TextDecoderStream())
     .pipeThrough(
       new TextDelimiterStream("\n\n"),
     );
 
-  for await (const data of bandwhichStream) {
-    yield parse(data);
+  try {
+    for await (const data of bandwhichStream) {
+      if (isExited) break;
+      yield parse(data);
+    }
+  } catch (e) {
+    console.error("bandwhich stream error:", e);
   }
 }
 
