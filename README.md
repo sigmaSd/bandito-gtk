@@ -6,6 +6,8 @@ Bandito GTK allows you to monitor network traffic per application and apply
 bandwidth limits (download and upload) using `eltrafico-tc` and `bandwhich` as
 backends.
 
+<img src="./distro/demo.png" />
+
 ## Features
 
 - **Real-time Monitoring:** Track download and upload rates for all running
