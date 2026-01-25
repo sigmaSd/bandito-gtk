@@ -3,12 +3,14 @@ import {
   Application,
   ApplicationWindow,
   Box,
+  Button,
   CheckButton,
   DropDown,
   Entry,
   Label,
   ListBox,
   Orientation,
+  ProgressBar,
   ScrolledWindow,
   StringList,
 } from "@sigmasd/gtk/gtk4";
@@ -17,18 +19,17 @@ import { ElTrafico } from "./eltrafico/eltrafico.ts";
 import { bandwhich } from "./netmonitor/bandwhich.ts";
 import { format } from "@std/fmt/bytes";
 import { Unit } from "./interfaces/table.ts";
+import {
+  checkMissingBinaries,
+  ensureBinaries,
+} from "./utils/binary_manager.ts";
+import { getNetworkInterfaces } from "./utils/network_interfaces.ts";
 
-const eltrafico = new ElTrafico();
-const userInterface = Deno.args[0];
-if (!userInterface) {
-  console.error(
-    "Please specify an interface, example `bandit wlan0` from gtkport directory",
-  );
-  Deno.exit(1);
-}
-await eltrafico.interface(userInterface);
+let userInterface = Deno.args[0];
 
-const monitor = Deno.env.get("MONITOR") || "default";
+let eltrafico: ElTrafico;
+let listBox: ListBox;
+const appsMap = new Map<string, AppRow>();
 
 class AppRow {
   box: Box;
@@ -143,10 +144,6 @@ class AppRow {
   }
 }
 
-const app = new Application("com.sigmasd.bandito", 0);
-const appsMap = new Map<string, AppRow>();
-let listBox: ListBox;
-
 function ensureAppRow(name: string, isGlobal = false) {
   let appRow = appsMap.get(name);
   if (!appRow) {
@@ -161,10 +158,93 @@ function ensureAppRow(name: string, isGlobal = false) {
   return appRow;
 }
 
+const app = new Application("com.sigmasd.bandito", 0);
+
 app.onActivate(() => {
   const window = new ApplicationWindow(app);
   window.setTitle("Bandito GTK");
   window.setDefaultSize(800, 600);
+
+  if (!userInterface) {
+    const interfaces = getNetworkInterfaces();
+    if (interfaces.length === 0) {
+      console.error("No network interfaces found.");
+      Deno.exit(1);
+    }
+
+    // If only one interface (excluding lo), just use it?
+    // Maybe better to always show selection for clarity unless force via CLI.
+
+    const box = new Box(Orientation.VERTICAL, 20);
+    box.setMarginTop(50);
+    box.setMarginBottom(50);
+    box.setMarginStart(50);
+    box.setMarginEnd(50);
+    box.setValign(Align.CENTER);
+    box.setHalign(Align.CENTER);
+
+    const label = new Label("Select Network Interface");
+    box.append(label);
+
+    const stringList = new StringList();
+    interfaces.forEach((i) => stringList.append(i));
+    const dropDown = new DropDown(stringList);
+    dropDown.setSelected(0);
+    box.append(dropDown);
+
+    const button = new Button("Start");
+    button.onClick(() => {
+      userInterface = interfaces[dropDown.getSelected()];
+      startAppFlow(window);
+    });
+    box.append(button);
+
+    window.setChild(box);
+    window.present();
+  } else {
+    startAppFlow(window);
+  }
+});
+
+async function startAppFlow(window: ApplicationWindow) {
+  const missing = await checkMissingBinaries();
+
+  if (missing) {
+    const box = new Box(Orientation.VERTICAL, 20);
+    box.setMarginTop(50);
+    box.setMarginBottom(50);
+    box.setMarginStart(50);
+    box.setMarginEnd(50);
+    box.setValign(Align.CENTER);
+
+    const label = new Label("Missing dependencies. Downloading...");
+    label.setHalign(Align.CENTER);
+    box.append(label);
+
+    const progressBar = new ProgressBar();
+    progressBar.setShowText(true);
+    progressBar.setHexpand(true);
+    box.append(progressBar);
+
+    window.setChild(box);
+
+    // Allow UI update
+    await new Promise((r) => setTimeout(r, 100));
+
+    await ensureBinaries((status, fraction) => {
+      label.setText(status);
+      progressBar.setFraction(fraction);
+    });
+
+    buildMainUI(window);
+  } else {
+    buildMainUI(window);
+  }
+}
+
+async function buildMainUI(window: ApplicationWindow) {
+  eltrafico = new ElTrafico();
+  await eltrafico.interface(userInterface);
 
   const mainBox = new Box(Orientation.VERTICAL, 0);
 
@@ -208,16 +288,18 @@ app.onActivate(() => {
   window.onCloseRequest(() => {
     (async () => {
       try {
-        await eltrafico.stop();
-        // Wait up to 5 seconds for clean exit
-        const statusPromise = eltrafico.wait();
-        const timeoutPromise = new Promise((r) =>
-          setTimeout(() => r("timeout"), 5000)
-        );
-        const result = await Promise.race([statusPromise, timeoutPromise]);
-        if (result === "timeout") {
-          console.log("Forcing eltrafico kill...");
-          eltrafico.kill();
+        if (eltrafico) {
+          await eltrafico.stop();
+          // Wait up to 5 seconds for clean exit
+          const statusPromise = eltrafico.wait();
+          const timeoutPromise = new Promise((r) =>
+            setTimeout(() => r("timeout"), 5000)
+          );
+          const result = await Promise.race([statusPromise, timeoutPromise]);
+          if (result === "timeout") {
+            console.log("Forcing eltrafico kill...");
+            eltrafico.kill();
+          }
         }
       } catch (e) {
         console.error("Error during shutdown:", e);
@@ -265,7 +347,7 @@ app.onActivate(() => {
       console.error("bandwhich error", e);
     }
   })();
-});
+}
 
 const eventLoop = new EventLoop();
 await eventLoop.start(app);

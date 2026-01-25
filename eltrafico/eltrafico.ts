@@ -1,3 +1,4 @@
+import { getBinaryPath } from "../utils/binary_manager.ts";
 import { Unit } from "../interfaces/table.ts";
 
 export interface Program {
@@ -21,17 +22,13 @@ export interface Program {
   };
 }
 
-function findEltraficoTc() {
-  return Deno.env.get("TC") || "eltrafico-tc";
-}
-
 export class ElTrafico {
   #tc: Deno.ChildProcess;
   #reader;
   #writer;
   constructor() {
     this.#tc = new Deno.Command("pkexec", {
-      args: [findEltraficoTc()],
+      args: [getBinaryPath("eltrafico-tc")],
       stdout: "piped",
       stdin: "piped",
       stderr: "inherit",
