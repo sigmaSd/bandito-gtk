@@ -1,0 +1,44 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@sigma/deno-compat@0.11": "0.11.0",
+    "jsr:@sigmasd/gtk@0.26": "0.26.0",
+    "jsr:@std/assert@^1.0.17": "1.0.17",
+    "jsr:@std/fmt@^1.0.9": "1.0.9",
+    "jsr:@std/internal@^1.0.12": "1.0.12"
+  },
+  "jsr": {
+    "@sigma/deno-compat@0.11.0": {
+      "integrity": "f2c55c04bd64a11499799b0c1d3fa2ef23330865720ff470451e3d2ae6c1d242"
+    },
+    "@sigmasd/gtk@0.26.0": {
+      "integrity": "a5970db23893637ac340c3c82c7fba1e45b897cfda7d08fe31d6a197b50f84eb",
+      "dependencies": [
+        "jsr:@sigma/deno-compat"
+      ]
+    },
+    "@std/assert@1.0.17": {
+      "integrity": "df5ebfffe77c03b3fa1401e11c762cc8f603d51021c56c4d15a8c7ab45e90dbe",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    },
+    "@std/fmt@1.0.9": {
+      "integrity": "2487343e8899fb2be5d0e3d35013e54477ada198854e52dd05ed0422eddcabe0"
+    },
+    "@std/internal@1.0.12": {
+      "integrity": "972a634fd5bc34b242024402972cd5143eac68d8dffaca5eaa4dba30ce17b027"
+    }
+  },
+  "remote": {
+    "https://deno.land/std@0.141.0/bytes/bytes_list.ts": "67eb118e0b7891d2f389dad4add35856f4ad5faab46318ff99653456c23b025d",
+    "https://deno.land/std@0.141.0/streams/delimiter.ts": "5a2de49a3af414207a0cae5c5d25842a21baf88c2b4f8e2f3787b29dd8d0d13d"
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@sigmasd/gtk@0.26",
+      "jsr:@std/assert@^1.0.17",
+      "jsr:@std/fmt@^1.0.9"
+    ]
+  }
+}

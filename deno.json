@@ -1,0 +1,10 @@
+{
+  "tasks": {
+    "dev": "deno run -A --unstable-ffi --watch main.ts"
+  },
+  "imports": {
+    "@sigmasd/gtk": "jsr:@sigmasd/gtk@^0.26.0",
+    "@std/assert": "jsr:@std/assert@^1.0.17",
+    "@std/fmt": "jsr:@std/fmt@^1.0.9"
+  }
+}
