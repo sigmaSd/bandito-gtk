@@ -56,7 +56,7 @@ class AppRow {
   ulLimitEntry: Entry;
   ulLimitUnit: DropDown;
   activeSwitch: Switch;
-  private debounceTimer: number | null = null;
+  private debounceTimer: NodeJS.Timeout | null = null;
 
   constructor(public name: string, public isGlobal: boolean = false) {
     this.box = new Box(Orientation.HORIZONTAL, 10);
@@ -291,6 +291,33 @@ async function startAppFlow(window: ApplicationWindow) {
   const missing = await checkMissingBinaries();
 
   if (missing) {
+    const showErrorUI = (errors: string[]) => {
+      const box = new Box(Orientation.VERTICAL, 20);
+      box.setMarginTop(50);
+      box.setMarginBottom(50);
+      box.setMarginStart(50);
+      box.setMarginEnd(50);
+      box.setValign(Align.CENTER);
+
+      const label = new Label("Failed to install required dependencies:");
+      label.setHalign(Align.CENTER);
+      box.append(label);
+
+      const errorLabel = new Label(errors.join("\n"));
+      errorLabel.setHalign(Align.CENTER);
+      errorLabel.setWrap(true);
+      box.append(errorLabel);
+
+      const retryBtn = new Button("Retry");
+      retryBtn.setHalign(Align.CENTER);
+      retryBtn.onClick(() => {
+        startAppFlow(window);
+      });
+      box.append(retryBtn);
+
+      window.setChild(box);
+    };
+
     const box = new Box(Orientation.VERTICAL, 20);
     box.setMarginTop(50);
     box.setMarginBottom(50);
@@ -312,10 +339,15 @@ async function startAppFlow(window: ApplicationWindow) {
     // Allow UI update
     await new Promise((r) => setTimeout(r, 100));
 
-    await ensureBinaries((status, fraction) => {
+    const errors = await ensureBinaries((status, fraction) => {
       label.setText(status);
       progressBar.setFraction(fraction);
     });
+
+    if (errors.length > 0) {
+      showErrorUI(errors);
+      return;
+    }
 
     buildMainUI(window);
   } else {

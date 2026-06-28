@@ -26,10 +26,25 @@ interface ReleaseInfo {
 export type ProgressCallback = (status: string, fraction: number) => void;
 
 async function getLatestRelease(repo: string): Promise<ReleaseInfo> {
+  const ghCommand = new Deno.Command("gh", {
+    args: ["api", `repos/${repo}/releases/latest`],
+    stdout: "piped",
+    stderr: "piped",
+  });
+  const ghOutput = await ghCommand.output();
+  if (ghOutput.success) {
+    return JSON.parse(new TextDecoder().decode(ghOutput.stdout));
+  }
+
   const response = await fetch(
     `https://api.github.com/repos/${repo}/releases/latest`,
   );
   if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error(
+        `GitHub API rate limit exceeded. Run "gh auth login" or set GITHUB_TOKEN, or try again later.`,
+      );
+    }
     throw new Error(
       `Failed to fetch release info for ${repo}: ${response.statusText}`,
     );
@@ -50,28 +65,37 @@ async function downloadFile(
   const total = contentLength ? parseInt(contentLength, 10) : 0;
   let loaded = 0;
 
-  const file = await Deno.open(dest, { create: true, write: true });
+  const file = await Deno.open(dest, {
+    create: true,
+    write: true,
+    truncate: true,
+  });
 
-  if (response.body) {
-    const reader = response.body.getReader();
-    const writer = file.writable.getWriter();
+  if (!response.body) {
+    file.close();
+    throw new Error(`No response body for ${url}`);
+  }
 
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (value) {
-          loaded += value.length;
-          if (total > 0 && onProgress) {
-            onProgress(loaded / total);
-          }
-          await writer.write(value);
+  const reader = response.body.getReader();
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        loaded += value.length;
+        if (total > 0 && onProgress) {
+          onProgress(loaded / total);
         }
+        await file.write(value);
       }
-    } finally {
-      writer.releaseLock();
-      file.close();
     }
+    if (total > 0 && loaded !== total) {
+      throw new Error(`Download incomplete: ${loaded}/${total} bytes`);
+    }
+  } finally {
+    file.sync();
+    file.close();
   }
 }
 
@@ -81,7 +105,11 @@ async function extractTar(file: string, dest: string) {
   });
   const output = await cmd.output();
   if (!output.success) {
-    throw new Error("Failed to extract tar archive");
+    await Deno.remove(file).catch(() => {});
+    const stderr = new TextDecoder().decode(output.stderr);
+    throw new Error(
+      `Corrupted download — archive could not be extracted. Delete ~/.cache/bandito and try again.\n${stderr.trim()}`,
+    );
   }
 }
 
@@ -186,8 +214,11 @@ export async function checkMissingBinaries(): Promise<boolean> {
   return missing;
 }
 
-export async function ensureBinaries(onProgress?: ProgressCallback) {
+export async function ensureBinaries(
+  onProgress?: ProgressCallback,
+): Promise<string[]> {
   await ensureDir(CACHE_DIR);
+  const errors: string[] = [];
 
   for (const [key, config] of Object.entries(BINARIES)) {
     const name = key as keyof typeof BINARIES;
@@ -200,12 +231,15 @@ export async function ensureBinaries(onProgress?: ProgressCallback) {
     if (output.success) continue;
 
     try {
-      if (onProgress) onProgress(`Checking ${name}...`, 0);
-      const info = await getLatestRelease(config.repo);
       const versionFile = join(CACHE_DIR, `${config.binaryName}.version`);
       const currentVersion = await exists(versionFile)
         ? await Deno.readTextFile(versionFile)
         : null;
+
+      if (currentVersion && await exists(finalPath)) continue;
+
+      if (onProgress) onProgress(`Checking ${name}...`, 0);
+      const info = await getLatestRelease(config.repo);
 
       if (currentVersion !== info.tag_name || !(await exists(finalPath))) {
         if (name === "eltrafico-tc") {
@@ -215,9 +249,13 @@ export async function ensureBinaries(onProgress?: ProgressCallback) {
         }
       }
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       console.error(`Failed to update/install ${name}:`, e);
+      errors.push(`${name}: ${msg}`);
+      if (onProgress) onProgress(`Failed to install ${name}: ${msg}`, 0);
     }
   }
+  return errors;
 }
 
 export function getBinaryPath(name: "eltrafico-tc" | "bandwhich"): string {
