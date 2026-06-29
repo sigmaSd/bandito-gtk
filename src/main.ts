@@ -93,6 +93,11 @@ appRef.onActivate(() => {
   const header = new HeaderBar();
   window.setTitlebar(header);
 
+  window.onCloseRequest(() => {
+    shutdown();
+    return false;
+  });
+
   if (!userInterface) {
     const interfaces = getNetworkInterfaces();
     if (interfaces.length === 0) {
@@ -243,11 +248,6 @@ async function buildMainUI(window: ApplicationWindow) {
 
   window.setChild(mainBox);
   window.present();
-
-  window.onCloseRequest(() => {
-    shutdown();
-    return false;
-  });
 
   (async () => {
     while (!shutdownInProgress) {
