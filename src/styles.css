@@ -4,7 +4,7 @@
 .header-cell {
   font-size: 0.8rem;
   font-weight: 700;
-  color: @theme_dim_color;
+  color: @theme_fg_color;
   font-family: monospace;
   padding: 6px 8px;
   letter-spacing: 0.05em;
