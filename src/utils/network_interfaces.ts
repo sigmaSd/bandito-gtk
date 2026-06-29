@@ -4,13 +4,11 @@ export function getNetworkInterfaces(): string[] {
     // @ts-ignore: Deno.networkInterfaces is available in Deno
     for (const iface of Deno.networkInterfaces()) {
       if (iface.family === "IPv4" && !iface.name.startsWith("lo")) {
-        // Just get unique names
         if (!interfaces.includes(iface.name)) {
           interfaces.push(iface.name);
         }
       }
     }
-    // Sort interfaces for better UX, pushing tailscale to the end
     return interfaces.sort((a, b) => {
       const aTail = a.startsWith("tailscale");
       const bTail = b.startsWith("tailscale");

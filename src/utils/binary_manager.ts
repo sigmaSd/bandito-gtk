@@ -138,7 +138,6 @@ async function installEltraficoTc(
   await Deno.rename(extractedPath, finalPath);
   await Deno.chmod(finalPath, 0o755);
 
-  // Cleanup
   await Deno.remove(tarPath);
   try {
     await Deno.remove(join(CACHE_DIR, "target"), { recursive: true });
@@ -171,12 +170,6 @@ async function installBandwhich(
   await extractTar(tarPath, CACHE_DIR);
 
   const finalPath = join(CACHE_DIR, "bandwhich");
-  // Assuming binary is at root of tarball
-  if (!(await exists(finalPath))) {
-    // Try to find it if it's in a subdir?
-    // For now, let's just assume it's there or user has to fix it if structure changes.
-  }
-
   await Deno.chmod(finalPath, 0o755);
   await Deno.remove(tarPath);
   await Deno.writeTextFile(join(CACHE_DIR, "bandwhich.version"), version);

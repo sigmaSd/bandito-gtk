@@ -1,5 +1,5 @@
 import { getBinaryPath } from "../utils/binary_manager.ts";
-import { Unit } from "../interfaces/table.ts";
+import type { Unit } from "../types.ts";
 
 export interface Program {
   name?: string;
@@ -41,7 +41,6 @@ export class ElTrafico {
     this.#reader = process.stdout.getReader();
     this.#writer = process.stdin.getWriter();
 
-    // Consume stderr and filter out the harmless shutdown panic
     (async () => {
       const decoder = new TextDecoder();
       const encoder = new TextEncoder();
@@ -66,7 +65,6 @@ export class ElTrafico {
       }
     })();
 
-    // Handle unexpected exit
     this.#tc.status.then((s) => {
       if (!s.success && !this.#isClosed) {
         console.error("eltrafico-tc process exited with error:", s.code);

@@ -11,7 +11,6 @@ export async function* bandwhich(interfaceName: string) {
   const process = command.spawn();
   let isExited = false;
 
-  // Consume stderr
   (async () => {
     for await (const chunk of process.stderr) {
       if (!isExited) {
@@ -22,7 +21,7 @@ export async function* bandwhich(interfaceName: string) {
 
   process.status.then((s) => {
     if (!s.success) {
-      if (s.code !== 143 && s.code !== 130) { // Ignore SIGTERM/SIGINT
+      if (s.code !== 143 && s.code !== 130) {
         console.error("bandwhich exited with error:", s.code);
       }
       isExited = true;
