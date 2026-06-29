@@ -108,7 +108,6 @@ export class ElTrafico {
     if (this.#isClosed) return;
     try {
       await this.#write("Stop");
-      await this.#writer.ready;
       await this.#writer.close();
     } catch {
       // Ignore errors during stop

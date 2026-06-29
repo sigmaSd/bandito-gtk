@@ -194,20 +194,17 @@ export async function checkMissingBinaries(): Promise<boolean> {
     const output = await command.output();
     if (output.success) continue;
 
-    // Check if we need update or install
+    const versionFile = join(CACHE_DIR, `${config.binaryName}.version`);
+    const currentVersion = await exists(versionFile)
+      ? await Deno.readTextFile(versionFile)
+      : null;
+
     try {
       const info = await getLatestRelease(config.repo);
-      const versionFile = join(CACHE_DIR, `${config.binaryName}.version`);
-      const currentVersion = await exists(versionFile)
-        ? await Deno.readTextFile(versionFile)
-        : null;
-
       if (currentVersion !== info.tag_name || !(await exists(finalPath))) {
         missing = true;
       }
     } catch {
-      // If we can't check, but file exists, assume it's ok?
-      // Or if file missing, definitely missing.
       if (!(await exists(finalPath))) missing = true;
     }
   }
@@ -236,8 +233,6 @@ export async function ensureBinaries(
         ? await Deno.readTextFile(versionFile)
         : null;
 
-      if (currentVersion && await exists(finalPath)) continue;
-
       if (onProgress) onProgress(`Checking ${name}...`, 0);
       const info = await getLatestRelease(config.repo);
 
@@ -247,6 +242,8 @@ export async function ensureBinaries(
         } else {
           await installBandwhich(info.tag_name, onProgress);
         }
+      } else {
+        if (onProgress) onProgress(`${name} is up to date`, 0);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
