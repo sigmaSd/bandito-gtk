@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0",
+  "version": "2.0.1",
   "imports": {
     "@sigmasd/gtk": "jsr:@sigmasd/gtk@^0.65.0",
     "@std/fmt": "jsr:@std/fmt@^1.0.10",
