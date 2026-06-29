@@ -49,26 +49,14 @@ async function shutdown() {
     appRow.cleanup();
   }
 
-  try {
-    if (eltrafico) {
-      await eltrafico.stop();
-      const waitPromise = eltrafico.wait();
-      const timeoutPromise = new Promise((r) =>
-        setTimeout(() => r("timeout"), 5000)
-      );
-      const result = await Promise.race([waitPromise, timeoutPromise]);
-      if (result === "timeout") {
-        eltrafico.kill();
-        await eltrafico.wait().catch(() => {});
-      }
-    }
-  } catch {
-    // ignore
+  if (eltrafico) {
+    await eltrafico.stop();
+    await eltrafico.wait();
   }
   eventLoop.stop();
 }
 
-Deno.addSignalListener("SIGINT", () => {
+Deno.addSignalListener("SIGINT", async () => {
   if (shutdownInProgress) return;
   shutdownInProgress = true;
 
@@ -77,9 +65,9 @@ Deno.addSignalListener("SIGINT", () => {
   }
 
   if (eltrafico) {
-    eltrafico.stop().catch(() => {});
+    await eltrafico.stop();
   }
-  setTimeout(() => eventLoop.stop(), 1000);
+  eventLoop.stop();
 });
 
 class AppRow {

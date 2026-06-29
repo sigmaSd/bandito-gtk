@@ -106,14 +106,13 @@ export class ElTrafico {
   }
   async stop() {
     if (this.#isClosed) return;
-    try {
-      await this.#write("Stop");
-      await this.#writer.close();
-    } catch {
-      // Ignore errors during stop
-    } finally {
-      this.#isClosed = true;
+    await this.#write("Stop");
+    while (true) {
+      const data = await this.#read();
+      if (!data) break;
+      if (data.includes("Stop")) break;
     }
+    this.#isClosed = true;
   }
   async wait() {
     return await this.#tc.status;
