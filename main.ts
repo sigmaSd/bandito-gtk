@@ -21,6 +21,7 @@ import {
   StyleContext,
   StyleProviderPriority,
 } from "@sigmasd/gtk/gtk4";
+import styles from "./styles.css" with { type: "text" };
 import { EventLoop } from "@sigmasd/gtk/eventloop";
 import { ElTrafico } from "./eltrafico/eltrafico.ts";
 import { bandwhich } from "./netmonitor/bandwhich.ts";
@@ -285,35 +286,13 @@ function ensureAppRow(name: string, isGlobal = false) {
   return appRow;
 }
 
-const CSS = `
-  .main-container { background-color: @window_bg_color; }
-  .header-cell { font-size: 0.8rem; font-weight: 700; color: @theme_dim_color; font-family: monospace; padding: 6px 8px; letter-spacing: 0.05em; background-color: @headerbar_bg_color; border-bottom: 2px solid @headerbar_border_color; }
-  .global-row { background-color: rgba(241, 196, 15, 0.12); }
-  .global-cell { font-weight: 700; font-size: 1rem; padding: 4px 10px; letter-spacing: 0.02em; }
-  .app-row-even { background-color: transparent; }
-  .app-row-odd { background-color: rgba(128, 128, 128, 0.04); }
-  .app-cell { font-size: 0.95rem; padding: 4px 10px; }
-  .app-name { font-weight: 600; }
-  .rate-cell { font-family: monospace; font-size: 0.95rem; font-weight: 700; padding: 0 8px; }
-  .dl-rate { color: #2ecc71; }
-  .ul-rate { color: #3498db; }
-  .limit-cell { padding: 2px 4px; }
-  .limit-display { font-family: monospace; font-size: 0.9rem; padding: 2px 6px; border: 1px solid transparent; border-radius: 3px; }
-  .limit-display:hover { border-color: rgba(128, 128, 128, 0.3); background-color: rgba(128, 128, 128, 0.05); }
-  .limit-entry { font-family: monospace; font-size: 0.9rem; min-height: 20px; }
-  .limit-unit { font-family: monospace; font-size: 0.85rem; color: @theme_dim_color; padding: 0 2px; }
-  .check-cell { padding: 2px 4px; }
-  .check-cell checkbutton { min-width: 16px; min-height: 16px; }
-  .check-cell checkbutton check { min-width: 14px; min-height: 14px; }
-`;
-
 appRef = new Application("com.sigmasd.bandito", 0);
 
 appRef.onActivate(() => {
   const display = Display.getDefault();
   if (display) {
     const provider = new CssProvider();
-    provider.loadFromData(CSS);
+    provider.loadFromData(styles);
     StyleContext.addProviderForDisplay(
       display,
       provider,
