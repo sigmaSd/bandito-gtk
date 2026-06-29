@@ -24,8 +24,8 @@ export async function* bandwhich(interfaceName: string) {
       if (s.code !== 143 && s.code !== 130) {
         console.error("bandwhich exited with error:", s.code);
       }
-      isExited = true;
     }
+    isExited = true;
   });
 
   const bandwhichStream = process.stdout

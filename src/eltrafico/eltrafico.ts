@@ -76,7 +76,11 @@ export class ElTrafico {
     if (this.#isClosed) return "";
     try {
       const data = await this.#reader.read();
-      if (data.done || !data.value) return "";
+      if (data.done) {
+        this.#isClosed = true;
+        return "";
+      }
+      if (!data.value) return "";
       return new TextDecoder().decode(data.value);
     } catch (e) {
       console.error("Error reading from eltrafico-tc:", e);
@@ -129,7 +133,7 @@ export class ElTrafico {
   async poll() {
     const data = await this.#read();
 
-    if (this.#isClosed || data == "Stop") {
+    if (!data || this.#isClosed || data == "Stop") {
       return { stop: true };
     }
 
