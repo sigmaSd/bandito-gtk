@@ -131,29 +131,29 @@ modules:
     sources:
       # deno CLI (x86_64)
       - type: archive
-        url: https://github.com/denoland/deno/releases/download/v2.5.1/deno-x86_64-unknown-linux-gnu.zip
-        sha256: bceddde4ff520f21c3767d893fe3d2d83df788346d3ad6f03d8abcd0392eb3ab
+        url: https://github.com/denoland/deno/releases/download/v2.8.3/deno-x86_64-unknown-linux-gnu.zip
+        sha256: 30455b845ffa6082209c3590269c910ad3b7efdf28c9879afd4006c47ae54197
         strip-components: 1
         only-arches:
           - x86_64
       # denort runtime (x86_64)
       - type: archive
-        url: https://github.com/denoland/deno/releases/download/v2.5.1/denort-x86_64-unknown-linux-gnu.zip
-        sha256: 8ea4c344bd945244186b60b2745f7cbe460f6bd8f8a7479b9dac2d57199fd298
+        url: https://github.com/denoland/deno/releases/download/v2.8.3/denort-x86_64-unknown-linux-gnu.zip
+        sha256: 214d0a4010c9c44326a82ea7fc3785c189a43cd83567d91aaa4dce3964759954
         strip-components: 1
         only-arches:
           - x86_64
       # deno CLI (aarch64)
       - type: archive
-        url: https://github.com/denoland/deno/releases/download/v2.5.1/deno-aarch64-unknown-linux-gnu.zip
-        sha256: fa9822bf4fae820126b4fe3f1925010c14ca5f626f5ad743b3d6c3c20e33ad1a
+        url: https://github.com/denoland/deno/releases/download/v2.8.3/deno-aarch64-unknown-linux-gnu.zip
+        sha256: d4589cc1ffcbf1995c92a0127d932aaf832ac70cfdcc6d5b7bf38043cf303575
         strip-components: 1
         only-arches:
           - aarch64
       # denort runtime (aarch64)
       - type: archive
-        url: https://github.com/denoland/deno/releases/download/v2.5.1/denort-aarch64-unknown-linux-gnu.zip
-        sha256: 772fce5bd2da44f379229bbaa7302a1e901740906f3a978c2b0f1335e00237c9
+        url: https://github.com/denoland/deno/releases/download/v2.8.3/denort-aarch64-unknown-linux-gnu.zip
+        sha256: 5acc74a4b1a191a88a9ce0b66cfa7e077b50352c124629d5186c5711df462415
         strip-components: 1
         only-arches:
           - aarch64
