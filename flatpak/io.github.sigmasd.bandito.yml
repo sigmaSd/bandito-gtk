@@ -17,8 +17,7 @@ finish-args:
   - --device=dri
   # Network (needed for Deno.networkInterfaces and backends)
   - --share=network
-  # D-Bus (needed for GApplication registration)
-  - --socket=session-bus
+
   # Allow spawning commands on host (for pkexec)
   - --talk-name=org.freedesktop.Flatpak
 

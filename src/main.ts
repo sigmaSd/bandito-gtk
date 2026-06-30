@@ -73,7 +73,7 @@ function ensureAppRow(name: string, isGlobal = false) {
   return appRow;
 }
 
-appRef = new Application("com.sigmasd.bandito", 0);
+appRef = new Application("io.github.sigmasd.bandito", 0);
 
 appRef.onActivate(() => {
   const display = Display.getDefault();
