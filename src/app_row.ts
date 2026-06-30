@@ -14,7 +14,6 @@ import { type ElTrafico } from "./eltrafico/eltrafico.ts";
 import type { Unit } from "./types.ts";
 
 export class AppRow {
-  grid: Grid;
   nameLabel: Label;
   dlRateLabel: Label;
   ulRateLabel: Label;
@@ -29,20 +28,17 @@ export class AppRow {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
+    grid: Grid,
+    row: number,
     eltrafico: ElTrafico,
     public name: string,
     public isGlobal: boolean = false,
-    private rowIndex: number = 0,
   ) {
     this.#eltrafico = eltrafico;
-    this.grid = new Grid();
-    this.grid.setColumnSpacing(0);
-    this.grid.setRowSpacing(0);
 
     const rowClass = isGlobal
       ? "global-row"
-      : (rowIndex % 2 === 0 ? "app-row-even" : "app-row-odd");
-    this.grid.addCssClass(rowClass);
+      : (row % 2 === 0 ? "app-row-even" : "app-row-odd");
 
     this.nameLabel = new Label(isGlobal ? "GLOBAL" : name);
     this.nameLabel.setHalign(Align.START);
@@ -50,25 +46,29 @@ export class AppRow {
     this.nameLabel.setEllipsize(3);
     this.nameLabel.addCssClass(isGlobal ? "global-cell" : "app-cell");
     if (!isGlobal) this.nameLabel.addCssClass("app-name");
-    this.grid.attach(this.nameLabel, 0, 0, 1, 1);
+    this.nameLabel.addCssClass(rowClass);
+    grid.attach(this.nameLabel, 0, row, 1, 1);
 
     this.dlRateLabel = new Label("__");
     this.dlRateLabel.setXalign(1.0);
     this.dlRateLabel.setSizeRequest(100, -1);
     this.dlRateLabel.addCssClass("rate-cell");
     this.dlRateLabel.addCssClass("dl-rate");
-    this.grid.attach(this.dlRateLabel, 1, 0, 1, 1);
+    this.dlRateLabel.addCssClass(rowClass);
+    grid.attach(this.dlRateLabel, 1, row, 1, 1);
 
     this.ulRateLabel = new Label("__");
     this.ulRateLabel.setXalign(1.0);
     this.ulRateLabel.setSizeRequest(100, -1);
     this.ulRateLabel.addCssClass("rate-cell");
     this.ulRateLabel.addCssClass("ul-rate");
-    this.grid.attach(this.ulRateLabel, 2, 0, 1, 1);
+    this.ulRateLabel.addCssClass(rowClass);
+    grid.attach(this.ulRateLabel, 2, row, 1, 1);
 
     this.dlLimitDisplay = new Label("100 kbps");
     this.dlLimitDisplay.addCssClass("limit-display");
     this.dlLimitDisplay.setHalign(Align.START);
+    this.dlLimitDisplay.addCssClass(rowClass);
 
     const dlPopoverBox = new Box(Orientation.HORIZONTAL, 4);
     dlPopoverBox.setMarginTop(6);
@@ -100,11 +100,12 @@ export class AppRow {
       if (this.checkButton.getActive()) this.updateLimitDebounced();
     });
 
-    this.grid.attach(this.dlLimitDisplay, 3, 0, 1, 1);
+    grid.attach(this.dlLimitDisplay, 3, row, 1, 1);
 
     this.ulLimitDisplay = new Label("100 kbps");
     this.ulLimitDisplay.addCssClass("limit-display");
     this.ulLimitDisplay.setHalign(Align.START);
+    this.ulLimitDisplay.addCssClass(rowClass);
 
     const ulPopoverBox = new Box(Orientation.HORIZONTAL, 4);
     ulPopoverBox.setMarginTop(6);
@@ -136,15 +137,16 @@ export class AppRow {
       if (this.checkButton.getActive()) this.updateLimitDebounced();
     });
 
-    this.grid.attach(this.ulLimitDisplay, 4, 0, 1, 1);
+    grid.attach(this.ulLimitDisplay, 4, row, 1, 1);
 
     this.checkButton = new CheckButton();
     this.checkButton.setHalign(Align.CENTER);
     this.checkButton.addCssClass("check-cell");
+    this.checkButton.addCssClass(rowClass);
     this.checkButton.onToggled(() => {
       this.updateLimitDebounced();
     });
-    this.grid.attach(this.checkButton, 5, 0, 1, 1);
+    grid.attach(this.checkButton, 5, row, 1, 1);
   }
 
   updateLimitDisplay() {

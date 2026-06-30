@@ -59,16 +59,10 @@ Deno.addSignalListener("SIGINT", () => {
 function ensureAppRow(name: string, isGlobal = false) {
   let appRow = appsMap.get(name);
   if (!appRow) {
-    const rowIndex = isGlobal ? 1 : appsMap.size + 1;
-    appRow = new AppRow(eltrafico, name, isGlobal, rowIndex);
+    const row = isGlobal ? 1 : tableRowCount;
+    appRow = new AppRow(tableGrid, row, eltrafico, name, isGlobal);
     appsMap.set(name, appRow);
-    if (isGlobal) {
-      tableGrid.attach(appRow.grid, 0, 1, 6, 1);
-    } else {
-      const row = tableRowCount;
-      tableGrid.attach(appRow.grid, 0, row, 6, 1);
-      tableRowCount++;
-    }
+    if (!isGlobal) tableRowCount++;
   }
   return appRow;
 }
