@@ -15,6 +15,10 @@ finish-args:
   - --socket=fallback-x11
   - --share=ipc
   - --device=dri
+  # Network (needed for Deno.networkInterfaces and backends)
+  - --share=network
+  # D-Bus (needed for GApplication registration)
+  - --socket=session-bus
   # Allow spawning commands on host (for pkexec)
   - --talk-name=org.freedesktop.Flatpak
 
@@ -22,28 +26,37 @@ modules:
   # ─── Module 1: eltrafico-tc (Rust) ──────────────────────────
   - name: eltrafico-tc
     buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      env:
+        CARGO_HOME: /run/build/eltrafico-tc/cargo
+        CARGO_NET_OFFLINE: 'true'
     build-commands:
-      # - . /usr/lib/sdk/rust-stable/enable.sh
-      - cargo build --manifest-path crates/eltrafico-tc/Cargo.toml --release
-      - install -Dm755 target/release/eltrafico_tc /app/bin/eltrafico-tc
+      - cargo --offline fetch --manifest-path Cargo.toml --verbose
+      - cargo build --offline --release
+      - install -Dm755 target/release/eltrafico-tc /app/bin/eltrafico-tc
     sources:
       - type: git
         url: https://github.com/sigmaSd/Eltrafico
         tag: 2.3.10
-        # commit: 2c065757303899629fe97ab8a132450c8b1e20e4
+      - eltrafico-sources.json
 
   # ─── Module 2: bandwhich (Rust) ─────────────────────────────
   - name: bandwhich
     buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      env:
+        CARGO_HOME: /run/build/bandwhich/cargo
+        CARGO_NET_OFFLINE: 'true'
     build-commands:
-      # - . /usr/lib/sdk/rust-stable/enable.sh
-      - cargo build --release
+      - cargo build --offline --release
       - install -Dm755 target/release/bandwhich /app/bin/bandwhich
     sources:
       - type: git
         url: https://github.com/imsnif/bandwhich
         tag: v0.23.1
-        # commit: adc6aa26aa25b448374d92941582057a550d4e5b
+      - bandwhich-sources.json
 
   # ─── Module 3: bandito-gtk (the app itself) ────────────────
   - name: bandito-gtk
@@ -52,7 +65,7 @@ modules:
       - mkdir -p /app/share/applications
 
       # Compile the Deno app
-      - DENORT_BIN=$PWD/denort ./deno compile --vendor --cached-only -A ./src/main.ts
+      - DENORT_BIN=$PWD/denort ./deno compile --no-check --output bandito-gtk --vendor --cached-only -A --unstable-raw-imports ./src/main.ts
       - mv bandito-gtk /app/bin/bandito-gtk
 
       # Install desktop file
@@ -118,29 +131,29 @@ modules:
     sources:
       # deno CLI (x86_64)
       - type: archive
-        url: https://github.com/denoland/deno/releases/download/v2.9.0/deno-x86_64-unknown-linux-gnu.zip
-        sha256: 96c9c73fc05ea57603bc28d8071d41e861bd40bcf2a9f849dd5969ed1a2c8498
+        url: https://github.com/denoland/deno/releases/download/v2.5.1/deno-x86_64-unknown-linux-gnu.zip
+        sha256: bceddde4ff520f21c3767d893fe3d2d83df788346d3ad6f03d8abcd0392eb3ab
         strip-components: 1
         only-arches:
           - x86_64
       # denort runtime (x86_64)
       - type: archive
-        url: https://github.com/denoland/deno/releases/download/v2.9.0/denort-x86_64-unknown-linux-gnu.zip
-        sha256: 04717f765622274fbefee08833953810fe2ca0a1758807f1dbc4fe8160dad851
+        url: https://github.com/denoland/deno/releases/download/v2.5.1/denort-x86_64-unknown-linux-gnu.zip
+        sha256: 8ea4c344bd945244186b60b2745f7cbe460f6bd8f8a7479b9dac2d57199fd298
         strip-components: 1
         only-arches:
           - x86_64
       # deno CLI (aarch64)
       - type: archive
-        url: https://github.com/denoland/deno/releases/download/v2.9.0/deno-aarch64-unknown-linux-gnu.zip
-        sha256: a0f266eb189af2f27db0c6dcf9eb2f68ba2e8bbff1442c969ace398463f8b2bf
+        url: https://github.com/denoland/deno/releases/download/v2.5.1/deno-aarch64-unknown-linux-gnu.zip
+        sha256: fa9822bf4fae820126b4fe3f1925010c14ca5f626f5ad743b3d6c3c20e33ad1a
         strip-components: 1
         only-arches:
           - aarch64
       # denort runtime (aarch64)
       - type: archive
-        url: https://github.com/denoland/deno/releases/download/v2.9.0/denort-aarch64-unknown-linux-gnu.zip
-        sha256: 66eed83db933ab5551e909c985d1a80bd05cf24703ece9638e2f773b1bc00f64
+        url: https://github.com/denoland/deno/releases/download/v2.5.1/denort-aarch64-unknown-linux-gnu.zip
+        sha256: 772fce5bd2da44f379229bbaa7302a1e901740906f3a978c2b0f1335e00237c9
         strip-components: 1
         only-arches:
           - aarch64
