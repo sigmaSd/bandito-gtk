@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  release:
+  binary:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -52,3 +52,73 @@ jobs:
           files: bandito-gtk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  flatpak:
+    name: "Flatpak (${{ matrix.arch }})"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      options: --privileged
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps
+        if: ${{ matrix.arch != 'x86_64' }}
+        run: |
+          curl https://download.docker.com/linux/static/stable/x86_64/docker-26.0.0.tgz --output ./docker.tgz
+          tar xzvf docker.tgz
+          mv docker/* /usr/bin
+
+      - name: Set up QEMU
+        if: ${{ matrix.arch != 'x86_64' }}
+        id: qemu
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: bandito-gtk-${{ matrix.arch }}.flatpak
+          manifest-path: flatpak/io.github.sigmasd.bandito.yml
+          cache-key: flatpak-builder-${{ matrix.arch }}-${{ github.sha }}
+          arch: ${{ matrix.arch }}
+
+  release-flatpak:
+    name: "Create Release"
+    needs: [binary, flatpak]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.sha }}
+          name: Build ${{ github.sha }}
+          files: |
+            artifacts/bandito-gtk-x86_64.flatpak
+            artifacts/bandito-gtk-aarch64.flatpak
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            Automated build from commit ${{ github.sha }}
+
+            Download the appropriate flatpak for your architecture:
+            - `bandito-gtk-x86_64.flatpak` for Intel/AMD (64-bit)
+            - `bandito-gtk-aarch64.flatpak` for ARM (64-bit)
+
+            To install: `flatpak install --user bandito-gtk-<arch>.flatpak`

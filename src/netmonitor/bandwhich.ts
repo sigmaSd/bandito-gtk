@@ -1,14 +1,34 @@
 import { TextDelimiterStream } from "@std/streams";
 import { getBinaryPath } from "../utils/binary_manager.ts";
+import { isFlatpak } from "../utils/flatpak.ts";
 
 export async function* bandwhich(interfaceName: string) {
-  const command = new Deno.Command("pkexec", {
-    args: [getBinaryPath("bandwhich"), "-p", "--raw", "-i", interfaceName],
+  const [command, ...args] = isFlatpak()
+    ? [
+      "flatpak-spawn",
+      "--host",
+      "pkexec",
+      getBinaryPath("bandwhich"),
+      "-p",
+      "--raw",
+      "-i",
+      interfaceName,
+    ]
+    : [
+      "pkexec",
+      getBinaryPath("bandwhich"),
+      "-p",
+      "--raw",
+      "-i",
+      interfaceName,
+    ];
+  const denoCommand = new Deno.Command(command, {
+    args,
     stdout: "piped",
     stderr: "piped",
   });
 
-  const process = command.spawn();
+  const process = denoCommand.spawn();
   let isExited = false;
 
   (async () => {

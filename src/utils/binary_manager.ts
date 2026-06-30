@@ -1,5 +1,6 @@
 import { join } from "@std/path";
 import { ensureDir, exists } from "@std/fs";
+import { getFlatpakInstallPath, isFlatpak } from "./flatpak.ts";
 
 const CACHE_DIR = Deno.env.get("XDG_CACHE_HOME")
   ? join(Deno.env.get("XDG_CACHE_HOME")!, "bandito")
@@ -176,6 +177,7 @@ async function installBandwhich(
 }
 
 export async function checkMissingBinaries(): Promise<boolean> {
+  if (isFlatpak()) return false;
   await ensureDir(CACHE_DIR);
   let missing = false;
   for (const [_key, config] of Object.entries(BINARIES)) {
@@ -207,6 +209,7 @@ export async function checkMissingBinaries(): Promise<boolean> {
 export async function ensureBinaries(
   onProgress?: ProgressCallback,
 ): Promise<string[]> {
+  if (isFlatpak()) return [];
   await ensureDir(CACHE_DIR);
   const errors: string[] = [];
 
@@ -252,6 +255,11 @@ export function getBinaryPath(name: "eltrafico-tc" | "bandwhich"): string {
   const config = BINARIES[name];
   const envPath = Deno.env.get(config.envVar);
   if (envPath) return envPath;
+
+  const flatpakPath = getFlatpakInstallPath();
+  if (flatpakPath) {
+    return `${flatpakPath}/bin/${config.binaryName}`;
+  }
 
   const cachePath = join(CACHE_DIR, config.binaryName);
   try {

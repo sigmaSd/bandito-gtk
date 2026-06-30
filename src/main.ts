@@ -24,6 +24,7 @@ import { bandwhich } from "./netmonitor/bandwhich.ts";
 import { AppRow } from "./app_row.ts";
 import { ensureBinaries } from "./utils/binary_manager.ts";
 import { getNetworkInterfaces } from "./utils/network_interfaces.ts";
+import { isFlatpak, resolveFlatpakInstallPath } from "./utils/flatpak.ts";
 
 let userInterface = Deno.args[0];
 
@@ -139,6 +140,10 @@ appRef.onActivate(() => {
 });
 
 async function startAppFlow(window: ApplicationWindow) {
+  if (isFlatpak()) {
+    await resolveFlatpakInstallPath();
+  }
+
   const showErrorUI = (errors: string[]) => {
     const box = new Box(Orientation.VERTICAL, 20);
     box.setMarginTop(50);

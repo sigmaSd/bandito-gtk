@@ -1,0 +1,153 @@
+app-id: io.github.sigmasd.bandito
+
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+
+command: bandito-gtk
+
+finish-args:
+  # Display
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+  # Allow spawning commands on host (for pkexec)
+  - --talk-name=org.freedesktop.Flatpak
+
+modules:
+  # ─── Module 1: eltrafico-tc (Rust) ──────────────────────────
+  - name: eltrafico-tc
+    buildsystem: simple
+    build-commands:
+      # - . /usr/lib/sdk/rust-stable/enable.sh
+      - cargo build --manifest-path crates/eltrafico-tc/Cargo.toml --release
+      - install -Dm755 target/release/eltrafico_tc /app/bin/eltrafico-tc
+    sources:
+      - type: git
+        url: https://github.com/sigmaSd/Eltrafico
+        tag: 2.3.10
+        # commit: 2c065757303899629fe97ab8a132450c8b1e20e4
+
+  # ─── Module 2: bandwhich (Rust) ─────────────────────────────
+  - name: bandwhich
+    buildsystem: simple
+    build-commands:
+      # - . /usr/lib/sdk/rust-stable/enable.sh
+      - cargo build --release
+      - install -Dm755 target/release/bandwhich /app/bin/bandwhich
+    sources:
+      - type: git
+        url: https://github.com/imsnif/bandwhich
+        tag: v0.23.1
+        # commit: adc6aa26aa25b448374d92941582057a550d4e5b
+
+  # ─── Module 3: bandito-gtk (the app itself) ────────────────
+  - name: bandito-gtk
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/share/applications
+
+      # Compile the Deno app
+      - DENORT_BIN=$PWD/denort ./deno compile --vendor --cached-only -A ./src/main.ts
+      - mv bandito-gtk /app/bin/bandito-gtk
+
+      # Install desktop file
+      - |
+          cat > /app/share/applications/io.github.sigmasd.bandito.desktop << 'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=Bandito GTK
+          Comment=Network bandwidth monitor and traffic shaper
+          Exec=bandito-gtk
+          Icon=io.github.sigmasd.bandito
+          Categories=System;Network;Settings;
+          StartupNotify=true
+          EOF
+
+      # Install icon
+      - mkdir -p /app/share/icons/hicolor/scalable/apps/
+      - |
+          cat > /app/share/icons/hicolor/scalable/apps/io.github.sigmasd.bandito.svg << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+            <rect width="128" height="128" fill="#33d17a" rx="16"/>
+            <text x="64" y="88" text-anchor="middle" font-family="sans-serif" font-size="56" fill="white" font-weight="bold">B</text>
+          </svg>
+          EOF
+
+      # Install metainfo
+      - mkdir -p /app/share/metainfo/
+      - |
+          cat > /app/share/metainfo/io.github.sigmasd.bandito.metainfo.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <component type="desktop-application">
+            <id>io.github.sigmasd.bandito</id>
+            <metadata_license>CC0-1.0</metadata_license>
+            <project_license>MIT</project_license>
+            <name>Bandito GTK</name>
+            <summary>Network bandwidth monitor and traffic shaper</summary>
+            <description>
+              <p>
+                Bandito GTK is a graphical tool for monitoring per-application network bandwidth usage
+                and applying traffic shaping rules using eltrafico-tc and bandwhich as backends.
+              </p>
+            </description>
+            <launchable type="desktop-id">io.github.sigmasd.bandito.desktop</launchable>
+            <categories>
+              <category>System</category>
+              <category>Network</category>
+            </categories>
+            <content_rating type="oars-1.1"/>
+            <provides>
+              <binary>bandito-gtk</binary>
+            </provides>
+            <releases>
+              <release version="2.0.1" date="2026-06-30">
+                <description>
+                  <p>Initial flatpak release</p>
+                </description>
+              </release>
+            </releases>
+          </component>
+          EOF
+
+    sources:
+      # deno CLI (x86_64)
+      - type: archive
+        url: https://github.com/denoland/deno/releases/download/v2.9.0/deno-x86_64-unknown-linux-gnu.zip
+        sha256: 96c9c73fc05ea57603bc28d8071d41e861bd40bcf2a9f849dd5969ed1a2c8498
+        strip-components: 1
+        only-arches:
+          - x86_64
+      # denort runtime (x86_64)
+      - type: archive
+        url: https://github.com/denoland/deno/releases/download/v2.9.0/denort-x86_64-unknown-linux-gnu.zip
+        sha256: 04717f765622274fbefee08833953810fe2ca0a1758807f1dbc4fe8160dad851
+        strip-components: 1
+        only-arches:
+          - x86_64
+      # deno CLI (aarch64)
+      - type: archive
+        url: https://github.com/denoland/deno/releases/download/v2.9.0/deno-aarch64-unknown-linux-gnu.zip
+        sha256: a0f266eb189af2f27db0c6dcf9eb2f68ba2e8bbff1442c969ace398463f8b2bf
+        strip-components: 1
+        only-arches:
+          - aarch64
+      # denort runtime (aarch64)
+      - type: archive
+        url: https://github.com/denoland/deno/releases/download/v2.9.0/denort-aarch64-unknown-linux-gnu.zip
+        sha256: 66eed83db933ab5551e909c985d1a80bd05cf24703ece9638e2f773b1bc00f64
+        strip-components: 1
+        only-arches:
+          - aarch64
+
+      # Local source code
+      - type: dir
+        path: ..
+
+      # Vendored JSR dependencies
+      - deno-sources.json

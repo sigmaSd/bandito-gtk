@@ -21,6 +21,8 @@ backends.
 
 ## Installation
 
+### Binary
+
 You can download the latest pre-compiled binary from the
 [Releases](https://github.com/sigmaSd/bandito-gtk/releases) page.
 
@@ -28,6 +30,16 @@ Once downloaded, make the binary executable:
 
 ```bash
 chmod +x bandito-gtk
+```
+
+### Flatpak
+
+You can install via Flatpak from the
+[Releases](https://github.com/sigmaSd/bandito-gtk/releases) page (build-*
+releases). Download the `.flatpak` file for your architecture and install:
+
+```bash
+flatpak install --user bandito-gtk-<arch>.flatpak
 ```
 
 ## Usage
