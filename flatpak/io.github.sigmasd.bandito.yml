@@ -27,7 +27,7 @@ modules:
 
       # Compile the Deno app
       - DENORT_BIN=$PWD/denort ./deno compile --no-check --output bandito-gtk --vendor --cached-only -A --unstable-raw-imports ./src/main.ts
-      - mv bandito-gtk /app/bin/bandito-gtk
+      - install -Dm755 bandito-gtk /app/bin/bandito-gtk
 
       # Install desktop file
       - |
