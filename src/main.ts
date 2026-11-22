@@ -32,8 +32,8 @@ import {
 /** BANDITO_DEMO=1 shows simulated traffic without root or downloads. */
 const DEMO = Deno.env.get("BANDITO_DEMO") === "1";
 /**
- * bandito-helper replaces bandwhich and eltrafico-tc when its system service
- * is installed, or with BANDITO_BACKEND=ebpf (and BANDITO_HELPER).
+ * netleash replaces bandwhich and eltrafico-tc when its system service
+ * is installed, or with BANDITO_BACKEND=ebpf (and NETLEASH).
  */
 const EBPF = !DEMO &&
   (Deno.env.get("BANDITO_BACKEND") === "ebpf" ||

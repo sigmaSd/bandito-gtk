@@ -89,6 +89,10 @@ Settings and saved limits live in `$XDG_CONFIG_HOME/bandito/settings.json`.
 
 The application relies on:
 
+- [netleash](https://github.com/sigmaSd/netleash), optional: when its service is
+  installed (`cargo install netleash && sudo ~/.cargo/bin/netleash --install`),
+  Bandito measures and limits through it, with IPv6 limits and no password
+  prompt at each start. Otherwise it uses the two helpers below.
 - `pkexec` (for root privileges when measuring and shaping traffic)
 - `eltrafico-tc` 2.3.10 and `bandwhich` 0.23.1, downloaded automatically
 

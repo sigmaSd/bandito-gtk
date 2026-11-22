@@ -8,7 +8,7 @@ import type { Backend, BackendEvents, LimitTarget } from "./types.ts";
 /** pkexec exits with 126 when the password prompt is dismissed. */
 const AUTH_REFUSED = 126;
 
-/** What bandito-helper reports once a second. */
+/** What netleash reports once a second. */
 export interface HelperSample {
   interface: string | null;
   total: { rx: number; tx: number };
@@ -62,10 +62,10 @@ export function convert(
   return { samples, connections };
 }
 
-/** Where scripts/install.sh puts bandito-helper and its D-Bus service. */
-export const INSTALLED_HELPER = "/usr/libexec/bandito-helper";
+/** Where `netleash --install` puts netleash and its D-Bus service. */
+export const INSTALLED_NETLEASH = "/usr/bin/netleash";
 export const SERVICE_FILE =
-  "/usr/share/dbus-1/system-services/io.github.sigmasd.Bandito.Helper.service";
+  "/usr/share/dbus-1/system-services/io.github.sigmasd.Netleash.service";
 
 /** Whether a host path exists, looking outside the sandbox in a Flatpak. */
 function hostPathExists(path: string): boolean {
@@ -84,13 +84,13 @@ function hostPathExists(path: string): boolean {
   }).outputSync().success;
 }
 
-/** Whether bandito-helper is installed as a system service. */
+/** Whether netleash is installed as a system service. */
 export function serviceInstalled(): boolean {
   return hostPathExists(SERVICE_FILE);
 }
 
 /**
- * The command that runs bandito-helper: its client, as the user, when the
+ * The command that runs netleash: its client, as the user, when the
  * system service is installed (polkit decides, no password at each start);
  * otherwise the helper itself as root through pkexec.
  */
@@ -103,20 +103,20 @@ export function helperCommand(
 ): string[] {
   const host = options.flatpak ? ["flatpak-spawn", "--host"] : [];
   if (options.service) {
-    return [...host, options.helper ?? INSTALLED_HELPER, "--client"];
+    return [...host, options.helper ?? INSTALLED_NETLEASH, "--client"];
   }
   if (!options.helper) {
     throw new Error(
-      "bandito-helper isn't installed; install it or set BANDITO_HELPER.",
+      "netleash isn't installed; run `sudo netleash --install`, or set NETLEASH.",
     );
   }
   return [...host, "pkexec", options.helper];
 }
 
 /**
- * Measures and limits traffic with bandito-helper, one eBPF program for both
+ * Measures and limits traffic with netleash, one eBPF program for both
  * jobs. Used when its system service is installed, or with
- * BANDITO_BACKEND=ebpf and BANDITO_HELPER set to the helper's path.
+ * BANDITO_BACKEND=ebpf and NETLEASH set to its path.
  */
 export class EbpfBackend implements Backend {
   #process: Deno.ChildProcess | null = null;
@@ -125,7 +125,7 @@ export class EbpfBackend implements Backend {
 
   async start(iface: string, events: BackendEvents): Promise<void> {
     const [command, ...args] = helperCommand({
-      helper: Deno.env.get("BANDITO_HELPER"),
+      helper: Deno.env.get("NETLEASH"),
       service: serviceInstalled(),
       flatpak: isFlatpak(),
     });
@@ -174,11 +174,11 @@ export class EbpfBackend implements Backend {
           }
         } else if (event.type === "error") {
           lastError = event.message;
-          console.error("bandito-helper:", event.message);
+          console.error("netleash:", event.message);
         }
       }
     })().catch((e) => {
-      if (!this.#stopping) console.error("bandito-helper stream error:", e);
+      if (!this.#stopping) console.error("netleash stream error:", e);
     });
 
     await this.#send({ cmd: "interface", name: iface });
