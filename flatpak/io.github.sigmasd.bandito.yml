@@ -133,6 +133,11 @@ modules:
               <binary>bandito-gtk</binary>
             </provides>
             <releases>
+              <release version="3.0.1" date="2026-11-22">
+                <description>
+                  <p>The helper programs Bandito downloads are pinned to exact versions and checked before they run as root.</p>
+                </description>
+              </release>
               <release version="3.0.0" date="2026-11-22">
                 <description>
                   <p>A redesign of the whole application.</p>

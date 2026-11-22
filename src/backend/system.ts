@@ -3,6 +3,7 @@ import { Bandwhich } from "../netmonitor/bandwhich.ts";
 import type { Limits } from "../model/settings.ts";
 import { toTc } from "../model/units.ts";
 import type { Backend, BackendEvents, LimitTarget } from "./types.ts";
+import { CHECKSUM_FAILED } from "../utils/binary_manager.ts";
 
 /** pkexec exits with 126 when the password prompt is dismissed. */
 const AUTH_REFUSED = 126;
@@ -27,6 +28,8 @@ export class SystemBackend implements Backend {
       events.failure(
         status.code === AUTH_REFUSED
           ? "Administrator access was not granted, so limits can't be applied."
+          : status.code === CHECKSUM_FAILED
+          ? "The traffic shaper didn't match its pinned checksum, so it wasn't run."
           : `The traffic shaper stopped (exit code ${status.code}).`,
       );
     });
@@ -44,6 +47,8 @@ export class SystemBackend implements Backend {
         events.failure(
           code === AUTH_REFUSED
             ? "Administrator access was not granted, so traffic can't be measured."
+            : code === CHECKSUM_FAILED
+            ? "The traffic monitor didn't match its pinned checksum, so it wasn't run."
             : `The traffic monitor stopped (exit code ${code}).`,
         );
       },

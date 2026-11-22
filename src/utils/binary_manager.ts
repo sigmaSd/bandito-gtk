@@ -1,56 +1,128 @@
 import { join } from "@std/path";
 import { ensureDir, exists } from "@std/fs";
+import { encodeHex } from "@std/encoding/hex";
 import { getFlatpakInstallPath, isFlatpak } from "./flatpak.ts";
 
 const CACHE_DIR = Deno.env.get("XDG_CACHE_HOME")
   ? join(Deno.env.get("XDG_CACHE_HOME")!, "bandito")
   : join(Deno.env.get("HOME")!, ".cache", "bandito");
 
-const BINARIES = {
+/** One downloadable build of a helper: the archive and the program in it. */
+interface Build {
+  url: string;
+  /** SHA-256 of the downloaded archive. */
+  archiveSha256: string;
+  /** Path of the program inside the archive. */
+  member: string;
+  /** SHA-256 of the program itself, checked again as root before each run. */
+  sha256: string;
+}
+
+interface Helper {
+  binaryName: string;
+  /** Environment variable that points at a program to use instead. */
+  envVar: string;
+  version: string;
+  builds: Partial<Record<typeof Deno.build.arch, Build>>;
+}
+
+/**
+ * The helper releases Bandito runs as root. Versions and checksums are pinned
+ * so a changed or replaced download is never run.
+ */
+export const HELPERS = {
   "eltrafico-tc": {
-    repo: "sigmaSd/Eltrafico",
     binaryName: "eltrafico-tc",
     envVar: "TC",
+    version: "2.3.10",
+    builds: {
+      x86_64: {
+        url:
+          "https://github.com/sigmaSd/Eltrafico/releases/download/2.3.10/eltrafico.tar",
+        archiveSha256:
+          "6e7c7706a2c5680eb3f890840d2f29635e2917ed9daa6475c864577a62a3219a",
+        member: "target/release/eltrafico_tc",
+        sha256:
+          "3c9fb3b8a7af6a74efe7211b71f74139857e91211477405264af50430ab69308",
+      },
+    },
   },
   "bandwhich": {
-    repo: "imsnif/bandwhich",
     binaryName: "bandwhich",
     envVar: "BANDWHICH",
+    version: "v0.23.1",
+    builds: {
+      x86_64: {
+        url:
+          "https://github.com/imsnif/bandwhich/releases/download/v0.23.1/bandwhich-v0.23.1-x86_64-unknown-linux-gnu.tar.gz",
+        archiveSha256:
+          "0de12665fcd1ecafbed84c372fb8edc568bb9eaffee95f53710b8c0b4c687637",
+        member: "bandwhich",
+        sha256:
+          "d18d24df363458669b9a54ff247356e953e55fa78220736b85eee2da2052f0df",
+      },
+      aarch64: {
+        url:
+          "https://github.com/imsnif/bandwhich/releases/download/v0.23.1/bandwhich-v0.23.1-aarch64-unknown-linux-gnu.tar.gz",
+        archiveSha256:
+          "46311a6e2652fc3fc386c1186baa6b986e925c686237434445b656112358ce4d",
+        member: "bandwhich",
+        sha256:
+          "8783c00b09627ec1644d223bddf0874a90dfa4cfad496fb25a7003f7d95006f5",
+      },
+    },
   },
-};
+} satisfies Record<string, Helper>;
 
-interface ReleaseInfo {
-  tag_name: string;
-  assets: { name: string; browser_download_url: string }[];
-}
+export type BinaryName = keyof typeof HELPERS;
+
+/** Exit code of the root-side check when a helper doesn't match its pin. */
+export const CHECKSUM_FAILED = 125;
+
+/** Root-owned folder holding the checked copies of the helpers. */
+export const VERIFIED_DIR = "/var/lib/bandito/helpers";
+
+/**
+ * Runs as root through pkexec. Copies the helper into a root-owned folder,
+ * checks the copy against its pinned SHA-256 there, then replaces itself with
+ * it. Checking the root-owned copy means the file can't be swapped between
+ * the check and the run. Older copies of the same helper are removed.
+ * Arguments: helper name, helper path, SHA-256, then the helper's own.
+ */
+export const VERIFY_AND_RUN = `set -eu
+name=$1; src=$2; sum=$3; shift 3
+dir=${VERIFIED_DIR}
+mkdir -p "$dir"; chmod 755 "$dir"
+dst="$dir/$name-$sum"
+if ! { [ -f "$dst" ] && echo "$sum  $dst" | sha256sum -c --status; }; then
+  tmp=$(mktemp "$dir/.new.XXXXXX")
+  cat -- "$src" > "$tmp"
+  if ! echo "$sum  $tmp" | sha256sum -c --status; then
+    rm -f "$tmp"
+    echo "bandito: $src does not match its pinned checksum; not running it" >&2
+    exit ${CHECKSUM_FAILED}
+  fi
+  chmod 755 "$tmp"
+  mv -f "$tmp" "$dst"
+  for old in "$dir/$name"-*; do
+    [ "$old" = "$dst" ] || rm -f "$old"
+  done
+fi
+exec "$dst" "$@"`;
 
 export type ProgressCallback = (status: string, fraction: number) => void;
 
-async function getLatestRelease(repo: string): Promise<ReleaseInfo> {
-  const ghCommand = new Deno.Command("gh", {
-    args: ["api", `repos/${repo}/releases/latest`],
-    stdout: "piped",
-    stderr: "piped",
-  });
-  const ghOutput = await ghCommand.output();
-  if (ghOutput.success) {
-    return JSON.parse(new TextDecoder().decode(ghOutput.stdout));
-  }
+export interface BinaryState {
+  phase: "checking" | "downloading" | "ready" | "failed";
+  /** What is happening, e.g. "Downloading bandwhich v0.23.1...". */
+  message: string;
+  /** Download progress from 0 to 1. */
+  fraction: number;
+}
 
-  const response = await fetch(
-    `https://api.github.com/repos/${repo}/releases/latest`,
-  );
-  if (!response.ok) {
-    if (response.status === 403) {
-      throw new Error(
-        `GitHub API rate limit exceeded. Run "gh auth login" or set GITHUB_TOKEN, or try again later.`,
-      );
-    }
-    throw new Error(
-      `Failed to fetch release info for ${repo}: ${response.statusText}`,
-    );
-  }
-  return await response.json();
+async function sha256(path: string): Promise<string> {
+  const data = await Deno.readFile(path);
+  return encodeHex(await crypto.subtle.digest("SHA-256", data));
 }
 
 async function downloadFile(
@@ -101,131 +173,83 @@ async function downloadFile(
 }
 
 async function extractTar(file: string, dest: string) {
-  const cmd = new Deno.Command("tar", {
+  const output = await new Deno.Command("tar", {
     args: ["-xf", file, "-C", dest],
-  });
-  const output = await cmd.output();
+  }).output();
   if (!output.success) {
-    await Deno.remove(file).catch(() => {});
     const stderr = new TextDecoder().decode(output.stderr);
+    throw new Error(`The archive could not be extracted.\n${stderr.trim()}`);
+  }
+}
+
+/** The pinned build for this machine, or an error saying there is none. */
+function buildFor(name: BinaryName): Build {
+  const helper: Helper = HELPERS[name];
+  const build = helper.builds[Deno.build.arch];
+  if (!build) {
     throw new Error(
-      `Corrupted download — archive could not be extracted. Delete ~/.cache/bandito and try again.\n${stderr.trim()}`,
+      `No ${name} build for ${Deno.build.arch}. Install ${name} yourself, ` +
+        `or set ${helper.envVar} to its path.`,
     );
   }
+  return build;
 }
 
-async function installEltraficoTc(
-  version: string,
-  onProgress?: ProgressCallback,
-) {
-  if (onProgress) onProgress(`Fetching info for eltrafico-tc...`, 0);
-  const info = await getLatestRelease(BINARIES["eltrafico-tc"].repo);
-  const asset = info.assets.find((a) => a.name === "eltrafico.tar");
-  if (!asset) throw new Error("Could not find eltrafico.tar");
-
-  const tarPath = join(CACHE_DIR, "eltrafico.tar");
-  await downloadFile(asset.browser_download_url, tarPath, (f) => {
-    if (onProgress) {
-      onProgress(`Downloading eltrafico-tc ${version}...`, f);
-    }
-  });
-
-  if (onProgress) onProgress(`Extracting eltrafico-tc...`, 1);
-  await extractTar(tarPath, CACHE_DIR);
-
-  const extractedPath = join(CACHE_DIR, "target/release/eltrafico_tc");
-  const finalPath = join(CACHE_DIR, "eltrafico-tc");
-
-  await Deno.rename(extractedPath, finalPath);
-  await Deno.chmod(finalPath, 0o755);
-
-  await Deno.remove(tarPath);
+/** Download, check and unpack one helper into the cache. */
+async function install(name: BinaryName, onProgress: ProgressCallback) {
+  const helper: Helper = HELPERS[name];
+  const build = buildFor(name);
+  const work = await Deno.makeTempDir({ dir: CACHE_DIR, prefix: ".install-" });
   try {
-    await Deno.remove(join(CACHE_DIR, "target"), { recursive: true });
-  } catch {
-    // ignore
-  }
-
-  await Deno.writeTextFile(join(CACHE_DIR, "eltrafico-tc.version"), version);
-}
-
-async function installBandwhich(
-  version: string,
-  onProgress?: ProgressCallback,
-) {
-  if (onProgress) onProgress(`Fetching info for bandwhich...`, 0);
-  const info = await getLatestRelease(BINARIES["bandwhich"].repo);
-  const asset = info.assets.find(
-    (a) => a.name.includes("unknown-linux-gnu") && a.name.includes("x86_64"),
-  );
-  if (!asset) throw new Error("Could not find suitable bandwhich binary");
-
-  const tarPath = join(CACHE_DIR, "bandwhich.tar.gz");
-  await downloadFile(asset.browser_download_url, tarPath, (f) => {
-    if (onProgress) {
-      onProgress(`Downloading bandwhich ${version}...`, f);
+    const archive = join(work, "archive");
+    await downloadFile(build.url, archive, (f) => {
+      onProgress(`Downloading ${name} ${helper.version}...`, f);
+    });
+    onProgress(`Checking ${name}...`, 1);
+    if (await sha256(archive) !== build.archiveSha256) {
+      throw new Error(
+        `The ${name} download doesn't match its pinned checksum, so it wasn't installed.`,
+      );
     }
-  });
-
-  if (onProgress) onProgress(`Extracting bandwhich...`, 1);
-  await extractTar(tarPath, CACHE_DIR);
-
-  const finalPath = join(CACHE_DIR, "bandwhich");
-  await Deno.chmod(finalPath, 0o755);
-  await Deno.remove(tarPath);
-  await Deno.writeTextFile(join(CACHE_DIR, "bandwhich.version"), version);
-}
-
-export async function checkMissingBinaries(): Promise<boolean> {
-  if (isFlatpak()) return false;
-  await ensureDir(CACHE_DIR);
-  let missing = false;
-  for (const [_key, config] of Object.entries(BINARIES)) {
-    const finalPath = join(CACHE_DIR, config.binaryName);
-
-    if (Deno.env.get(config.envVar)) continue;
-
-    const command = new Deno.Command("which", { args: [config.binaryName] });
-    const output = await command.output();
-    if (output.success) continue;
-
-    const versionFile = join(CACHE_DIR, `${config.binaryName}.version`);
-    const currentVersion = await exists(versionFile)
-      ? await Deno.readTextFile(versionFile)
-      : null;
-
-    try {
-      const info = await getLatestRelease(config.repo);
-      if (currentVersion !== info.tag_name || !(await exists(finalPath))) {
-        missing = true;
-      }
-    } catch {
-      if (!(await exists(finalPath))) missing = true;
+    await extractTar(archive, work);
+    const program = join(work, build.member);
+    if (await sha256(program) !== build.sha256) {
+      throw new Error(
+        `The ${name} program doesn't match its pinned checksum, so it wasn't installed.`,
+      );
     }
+    await Deno.chmod(program, 0o755);
+    await Deno.rename(program, join(CACHE_DIR, helper.binaryName));
+    // Left by Bandito 3.0.0, which tracked GitHub's latest release.
+    await Deno.remove(join(CACHE_DIR, `${helper.binaryName}.version`))
+      .catch(() => {});
+  } finally {
+    await Deno.remove(work, { recursive: true }).catch(() => {});
   }
-  return missing;
 }
 
-export type BinaryName = keyof typeof BINARIES;
-
-export interface BinaryState {
-  phase: "checking" | "downloading" | "ready" | "failed";
-  /** What is happening, e.g. "Downloading bandwhich v0.23.1...". */
-  message: string;
-  /** Download progress from 0 to 1. */
-  fraction: number;
+/** Whether a helper is provided outside Bandito's cache. */
+async function providedElsewhere(helper: Helper): Promise<string | null> {
+  if (Deno.env.get(helper.envVar)) return `Set by ${helper.envVar}`;
+  const output = await new Deno.Command("which", {
+    args: [helper.binaryName],
+    stdout: "null",
+    stderr: "null",
+  }).output();
+  return output.success ? "Installed" : null;
 }
 
 /**
- * Make sure eltrafico-tc and bandwhich are installed and current, reporting
- * each one's progress. Returns one message per binary that failed.
+ * Make sure eltrafico-tc and bandwhich are downloaded and match their pinned
+ * checksums, reporting each one's progress. Returns one message per binary
+ * that failed.
  */
 export async function ensureBinaries(
   onProgress?: (binary: BinaryName, state: BinaryState) => void,
 ): Promise<string[]> {
   const report = (binary: BinaryName, state: BinaryState) =>
     onProgress?.(binary, state);
-  const names = Object.keys(BINARIES) as BinaryName[];
+  const names = Object.keys(HELPERS) as BinaryName[];
   if (isFlatpak()) {
     for (const name of names) {
       report(name, { phase: "ready", message: "Included", fraction: 1 });
@@ -236,64 +260,31 @@ export async function ensureBinaries(
   const errors: string[] = [];
 
   for (const name of names) {
-    const config = BINARIES[name];
-    const finalPath = join(CACHE_DIR, config.binaryName);
-
-    if (Deno.env.get(config.envVar)) {
-      report(name, {
-        phase: "ready",
-        message: "Set by " + config.envVar,
-        fraction: 1,
-      });
-      continue;
-    }
-
-    const command = new Deno.Command("which", { args: [config.binaryName] });
-    const output = await command.output();
-    if (output.success) {
-      report(name, { phase: "ready", message: "Installed", fraction: 1 });
-      continue;
-    }
-
+    const helper: Helper = HELPERS[name];
     try {
-      const versionFile = join(CACHE_DIR, `${config.binaryName}.version`);
-      const currentVersion = await exists(versionFile)
-        ? (await Deno.readTextFile(versionFile)).trim()
-        : null;
-
-      report(name, {
-        phase: "checking",
-        message: "Checking for updates…",
-        fraction: 0,
-      });
-      let info: ReleaseInfo | null = null;
-      try {
-        info = await getLatestRelease(config.repo);
-      } catch (e) {
-        // Offline is fine when a copy is already downloaded.
-        if (!(await exists(finalPath))) throw e;
+      const elsewhere = await providedElsewhere(helper);
+      if (elsewhere) {
+        report(name, { phase: "ready", message: elsewhere, fraction: 1 });
+        continue;
       }
-
-      if (
-        info && (currentVersion !== info.tag_name || !(await exists(finalPath)))
-      ) {
-        const progress: ProgressCallback = (message, fraction) =>
-          report(name, { phase: "downloading", message, fraction });
-        if (name === "eltrafico-tc") {
-          await installEltraficoTc(info.tag_name, progress);
-        } else {
-          await installBandwhich(info.tag_name, progress);
-        }
+      report(name, { phase: "checking", message: "Checking…", fraction: 0 });
+      const build = buildFor(name);
+      const path = join(CACHE_DIR, helper.binaryName);
+      if (!(await exists(path)) || await sha256(path) !== build.sha256) {
+        await install(
+          name,
+          (message, fraction) =>
+            report(name, { phase: "downloading", message, fraction }),
+        );
       }
-      const version = info?.tag_name ?? currentVersion;
       report(name, {
         phase: "ready",
-        message: version ? `Version ${version}` : "Downloaded",
+        message: `Version ${helper.version}`,
         fraction: 1,
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error(`Failed to update/install ${name}:`, e);
+      console.error(`Failed to install ${name}:`, e);
       errors.push(`${name}: ${msg}`);
       report(name, { phase: "failed", message: msg, fraction: 0 });
     }
@@ -301,23 +292,45 @@ export async function ensureBinaries(
   return errors;
 }
 
-export function getBinaryPath(name: "eltrafico-tc" | "bandwhich"): string {
-  const config = BINARIES[name];
-  const envPath = Deno.env.get(config.envVar);
-  if (envPath) return envPath;
+/**
+ * The command that runs a helper as root: through `pkexec`, and from the host
+ * when Bandito is a Flatpak. Helpers Bandito downloaded are checked against
+ * their pinned checksum as root first; ones set by environment variable,
+ * installed on the system or shipped in the Flatpak are run as they are.
+ */
+export function helperCommand(name: BinaryName, args: string[]): string[] {
+  const helper: Helper = HELPERS[name];
+  const pkexec = isFlatpak()
+    ? ["flatpak-spawn", "--host", "pkexec"]
+    : ["pkexec"];
+
+  const envPath = Deno.env.get(helper.envVar);
+  if (envPath) return [...pkexec, envPath, ...args];
 
   const flatpakPath = getFlatpakInstallPath();
   if (flatpakPath) {
-    return `${flatpakPath}/bin/${config.binaryName}`;
+    return [...pkexec, `${flatpakPath}/bin/${helper.binaryName}`, ...args];
   }
 
-  const cachePath = join(CACHE_DIR, config.binaryName);
+  const cachePath = join(CACHE_DIR, helper.binaryName);
+  const build = helper.builds[Deno.build.arch];
   try {
-    const stat = Deno.statSync(cachePath);
-    if (stat.isFile) return cachePath;
+    if (build && Deno.statSync(cachePath).isFile) {
+      return [
+        ...pkexec,
+        "/bin/sh",
+        "-c",
+        VERIFY_AND_RUN,
+        "bandito-helper",
+        name,
+        cachePath,
+        build.sha256,
+        ...args,
+      ];
+    }
   } catch {
-    // ignore
+    // Not downloaded; fall back to the system's copy.
   }
 
-  return config.binaryName;
+  return [...pkexec, helper.binaryName, ...args];
 }

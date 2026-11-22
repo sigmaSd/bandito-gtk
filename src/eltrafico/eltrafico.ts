@@ -1,5 +1,4 @@
-import { getBinaryPath } from "../utils/binary_manager.ts";
-import { isFlatpak } from "../utils/flatpak.ts";
+import { helperCommand } from "../utils/binary_manager.ts";
 import type { Unit } from "../model/units.ts";
 
 export interface Program {
@@ -30,9 +29,7 @@ export class ElTrafico {
   #isClosed = false;
 
   constructor() {
-    const [command, ...args] = isFlatpak()
-      ? ["flatpak-spawn", "--host", "pkexec", getBinaryPath("eltrafico-tc")]
-      : ["pkexec", getBinaryPath("eltrafico-tc")];
+    const [command, ...args] = helperCommand("eltrafico-tc", []);
     const denoCommand = new Deno.Command(command, {
       args,
       stdout: "piped",

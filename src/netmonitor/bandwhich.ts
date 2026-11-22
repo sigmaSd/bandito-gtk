@@ -1,6 +1,5 @@
 import { TextDelimiterStream } from "@std/streams";
-import { getBinaryPath } from "../utils/binary_manager.ts";
-import { isFlatpak } from "../utils/flatpak.ts";
+import { helperCommand } from "../utils/binary_manager.ts";
 import type { ConnectionSample, Sample } from "../model/store.ts";
 
 /** Runs `bandwhich --raw` as root and reports per-process rates. */
@@ -18,14 +17,16 @@ export class Bandwhich {
     onSample: (samples: Sample[], connections: ConnectionSample[]) => void,
     onExit: (code: number, ranForMs: number) => void,
   ): void {
-    const binary = getBinaryPath("bandwhich");
     // Processes and connections; connections carry the remote host and port.
-    const args = ["-p", "-c", "--raw", "-i", interfaceName];
-    const [command, ...prefix] = isFlatpak()
-      ? ["flatpak-spawn", "--host", "pkexec", binary]
-      : ["pkexec", binary];
+    const [command, ...args] = helperCommand("bandwhich", [
+      "-p",
+      "-c",
+      "--raw",
+      "-i",
+      interfaceName,
+    ]);
     const process = new Deno.Command(command, {
-      args: [...prefix, ...args],
+      args,
       stdout: "piped",
       stderr: "piped",
     }).spawn();

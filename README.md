@@ -89,7 +89,14 @@ Settings and saved limits live in `$XDG_CONFIG_HOME/bandito/settings.json`.
 
 The application relies on:
 
-- `pkexec` (for root privileges when shaping traffic)
-- `eltrafico-tc` (automatically downloaded)
-- `bandwhich` (automatically downloaded)
+- `pkexec` (for root privileges when measuring and shaping traffic)
+- `eltrafico-tc` 2.3.10 and `bandwhich` 0.23.1, downloaded automatically
+
+Bandito downloads exact versions of the two helpers and checks their SHA-256
+checksums. Before each run, a short root script copies the helper into
+`/var/lib/bandito/helpers`, checks the copy and runs it, so a changed file in
+`~/.cache/bandito` is never run as root. Because of this, the password prompt
+names `/bin/sh`. To use your own builds, install them on your `PATH`, or set
+`TC` and `BANDWHICH` to their paths; those are run as they are.
+
 - GTK4 libraries
