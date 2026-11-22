@@ -36,7 +36,7 @@ export interface ConnectionInfo extends ConnectionSample {
 }
 
 export interface AppEntry {
-  /** Process name reported by bandwhich and eltrafico. */
+  /** App or service id reported by netleash. */
   readonly name: string;
   download: Rate;
   upload: Rate;

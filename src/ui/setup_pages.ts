@@ -109,8 +109,6 @@ export class SetupPage {
     const box = new Box(Orientation.VERTICAL, 18);
     const group = new PreferencesGroup();
     const titles: Record<BinaryName, string> = {
-      "bandwhich": "Traffic monitor",
-      "eltrafico-tc": "Traffic shaper",
       "netleash": "Traffic monitor and limiter",
     };
     this.#steps = {};
@@ -140,9 +138,7 @@ export class SetupPage {
     this.widget = page(
       "security-high-symbolic",
       "Getting Ready",
-      `Measuring and limiting traffic per app needs ${
-        helpers.length === 1 ? "a small helper" : "two small helpers"
-      } and administrator access. You'll be asked for your password when monitoring starts.`,
+      "Measuring and limiting traffic per app needs a small helper and administrator access. You'll be asked for your password when monitoring starts.",
       box,
     );
   }

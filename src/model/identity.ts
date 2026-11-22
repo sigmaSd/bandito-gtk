@@ -5,7 +5,7 @@ export interface Identity {
   title: string;
   subtitle: string;
   icon: AppIcon | null;
-  /** Whether eltrafico can shape this process's traffic. */
+  /** Whether netleash can limit this app's traffic. */
   limitable: boolean;
   /** Text matched by search. */
   keywords: string;

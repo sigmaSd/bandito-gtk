@@ -4,6 +4,7 @@ import { UNKNOWN_PROCESS } from "../model/identity.ts";
 import type { Limits } from "../model/settings.ts";
 import type { ConnectionSample, Sample } from "../model/store.ts";
 import type { Backend, BackendEvents, LimitTarget } from "./types.ts";
+import type { Launch } from "../utils/binary_manager.ts";
 
 /** pkexec exits with 126 when the password prompt is dismissed. */
 const AUTH_REFUSED = 126;
@@ -105,9 +106,8 @@ function onPath(): string | null {
 }
 
 /**
- * How to run netleash, or null to use bandwhich and eltrafico-tc. In order:
- * NETLEASH; a netleash with its capabilities on the PATH; the pinned
- * download where a build exists. A netleash without capabilities on the
+ * How to run netleash. In order: NETLEASH; a netleash with its capabilities
+ * on the PATH; otherwise the pinned download. A netleash without capabilities on the
  * PATH is never run through pkexec: it may sit in a user-writable directory
  * such as ~/.cargo/bin, which is why the pinned copy is checked as root
  * before it runs.
@@ -116,9 +116,8 @@ export function chooseNetleash(options: {
   env?: string;
   path: string | null;
   capable: (path: string) => boolean;
-  pinnedBuild: boolean;
   flatpak: boolean;
-}): NetleashPlan | null {
+}): NetleashPlan {
   const host = (args: string[]) =>
     options.flatpak ? ["flatpak-spawn", "--host", ...args] : args;
   if (options.env) {
@@ -129,37 +128,37 @@ export function chooseNetleash(options: {
   if (options.path && options.capable(options.path)) {
     return { kind: "capable", command: host([options.path]) };
   }
-  if (options.pinnedBuild && !options.flatpak) return { kind: "pinned" };
-  return null;
+  return { kind: "pinned" };
 }
 
 /** chooseNetleash() for this machine. */
-export function netleashPlan(pinnedBuild: boolean): NetleashPlan | null {
+export function netleashPlan(): NetleashPlan {
   return chooseNetleash({
     env: Deno.env.get("NETLEASH"),
     path: onPath(),
     capable,
-    pinnedBuild,
     flatpak: isFlatpak(),
   });
 }
 
 /**
  * Measures and limits traffic with netleash, one eBPF program for both
- * jobs, run by the command `commandLine` gives when monitoring starts.
+ * jobs, started with the launch `launch` gives when monitoring starts.
  */
 export class EbpfBackend implements Backend {
   #process: Deno.ChildProcess | null = null;
   #writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
   #stopping = false;
-  readonly #commandLine: () => string[];
+  /** Resolves true once netleash says it's ready, false if it exits first. */
+  #ready: Promise<boolean> = Promise.resolve(false);
+  readonly #launch: () => Launch;
 
-  constructor(commandLine: () => string[]) {
-    this.#commandLine = commandLine;
+  constructor(launch: () => Launch) {
+    this.#launch = launch;
   }
 
   async start(iface: string, events: BackendEvents): Promise<void> {
-    const [command, ...args] = this.#commandLine();
+    const { command: [command, ...args], script } = this.#launch();
     const process = new Deno.Command(command, {
       args,
       stdin: "piped",
@@ -170,6 +169,14 @@ export class EbpfBackend implements Backend {
     this.#writer = process.stdin.getWriter();
     this.#stopping = false;
     let lastError = "";
+    let markReady: (ready: boolean) => void = () => {};
+    this.#ready = new Promise((resolve) => (markReady = resolve));
+    process.status.then(() => markReady(false));
+    // The root-side check goes first. Commands wait for netleash's "ready":
+    // a shell such as dash reads stdin in blocks and would swallow them.
+    if (script) {
+      await this.#writer.write(new TextEncoder().encode(script));
+    }
 
     process.status.then((status) => {
       if (this.#stopping || this.#process !== process) return;
@@ -194,7 +201,9 @@ export class EbpfBackend implements Backend {
         } catch {
           continue;
         }
-        if (event.type === "sample") {
+        if (event.type === "ready") {
+          markReady(true);
+        } else if (event.type === "sample") {
           const { samples, connections } = convert(event as HelperSample);
           events.sample(samples, connections);
           for (const { name } of samples) {
@@ -216,7 +225,9 @@ export class EbpfBackend implements Backend {
   }
 
   async #send(command: unknown): Promise<void> {
-    if (!this.#writer) throw new Error("The traffic helper isn't running.");
+    if (!(await this.#ready) || !this.#writer) {
+      throw new Error("The traffic helper isn't running.");
+    }
     await this.#writer.write(
       new TextEncoder().encode(JSON.stringify(command) + "\n"),
     );
@@ -242,8 +253,20 @@ export class EbpfBackend implements Backend {
     const process = this.#process;
     this.#process = null;
     if (!process) return;
+    // Still at the password prompt: there's nothing to stop yet.
+    const started = await Promise.race([
+      this.#ready,
+      new Promise<false>((resolve) => setTimeout(() => resolve(false), 0)),
+    ]);
+    if (!started) {
+      try {
+        process.kill();
+      } catch {
+        // Already gone.
+      }
+    }
     try {
-      await this.#send({ cmd: "stop" });
+      if (started) await this.#send({ cmd: "stop" });
       await this.#writer?.close();
     } catch {
       // Already gone.

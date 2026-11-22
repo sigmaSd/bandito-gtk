@@ -4,9 +4,6 @@ runtime: org.gnome.Platform
 runtime-version: "50"
 sdk: org.gnome.Sdk
 
-sdk-extensions:
-  - org.freedesktop.Sdk.Extension.rust-stable
-
 command: bandito-gtk
 
 finish-args:
@@ -18,46 +15,11 @@ finish-args:
   # Network (needed for Deno.networkInterfaces and backends)
   - --share=network
 
-  # Allow spawning commands on host (for pkexec)
+  # Run netleash on the host (as you with its capabilities, or through pkexec)
   - --talk-name=org.freedesktop.Flatpak
 
 modules:
-  # ─── Module 1: eltrafico-tc (Rust) ──────────────────────────
-  - name: eltrafico-tc
-    buildsystem: simple
-    build-options:
-      append-path: /usr/lib/sdk/rust-stable/bin
-      env:
-        CARGO_HOME: /run/build/eltrafico-tc/cargo
-        CARGO_NET_OFFLINE: "true"
-    build-commands:
-      - cargo --offline fetch --manifest-path Cargo.toml --verbose
-      - cargo build --offline --release
-      - install -Dm755 target/release/eltrafico-tc /app/bin/eltrafico-tc
-    sources:
-      - type: git
-        url: https://github.com/sigmaSd/Eltrafico
-        tag: 2.3.10
-      - eltrafico-sources.json
-
-  # ─── Module 2: bandwhich (Rust) ─────────────────────────────
-  - name: bandwhich
-    buildsystem: simple
-    build-options:
-      append-path: /usr/lib/sdk/rust-stable/bin
-      env:
-        CARGO_HOME: /run/build/bandwhich/cargo
-        CARGO_NET_OFFLINE: "true"
-    build-commands:
-      - cargo build --offline --release
-      - install -Dm755 target/release/bandwhich /app/bin/bandwhich
-    sources:
-      - type: git
-        url: https://github.com/imsnif/bandwhich
-        tag: v0.23.1
-      - bandwhich-sources.json
-
-  # ─── Module 3: bandito-gtk (the app itself) ────────────────
+  # ─── bandito-gtk (the app itself) ────────────────
   - name: bandito-gtk
     buildsystem: simple
     build-commands:
@@ -97,8 +59,8 @@ modules:
             <description>
               <p>
                 Bandito GTK shows how much each application downloads and uploads, and lets you
-                limit any of them, or all of them at once. It uses bandwhich to measure traffic
-                and eltrafico-tc to shape it.
+                limit any of them, or all of them at once, over IPv4 and IPv6. It measures and
+                limits with netleash, which uses eBPF.
               </p>
               <ul>
                 <li>Live rates and a short history for every application</li>

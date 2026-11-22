@@ -61,8 +61,3 @@ export function formatLimit(rate: Rate, bits: boolean): string {
   const unit = limitUnits(bits)[preferredUnit(rate, bits)];
   return `${trim(rate / unit.bytes)} ${unit.label}`;
 }
-
-/** The value `tc` should receive for a limit in bytes per second. */
-export function toTc(rate: Rate): { value: number; unit: Unit } {
-  return { value: Math.max(1, Math.round(rate)), unit: "bps" };
-}

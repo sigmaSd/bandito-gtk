@@ -1,29 +1,22 @@
 import { join } from "@std/path";
 import { ensureDir, exists } from "@std/fs";
 import { encodeHex } from "@std/encoding/hex";
-import { getFlatpakInstallPath, isFlatpak } from "./flatpak.ts";
+import { isFlatpak } from "./flatpak.ts";
 
 const CACHE_DIR = Deno.env.get("XDG_CACHE_HOME")
   ? join(Deno.env.get("XDG_CACHE_HOME")!, "bandito")
   : join(Deno.env.get("HOME")!, ".cache", "bandito");
 
-/** One downloadable build of a helper: the archive and the program in it. */
+/** One downloadable build of a helper. */
 interface Build {
   url: string;
-  /** SHA-256 of the downloaded archive. */
-  archiveSha256: string;
-  /** Path of the program inside the archive; null when the download is the
-   * program itself. */
-  member: string | null;
-  /** SHA-256 of the program itself, checked again as root before each run. */
+  /** SHA-256 of the program, checked after download and again as root
+   * before each run. */
   sha256: string;
 }
 
 interface Helper {
   binaryName: string;
-  /** Whether a copy on the PATH may be run through pkexec. Not for
-   * netleash: `cargo install` puts it in a user-writable directory. */
-  fromPath: boolean;
   /** Environment variable that points at a program to use instead. */
   envVar: string;
   version: string;
@@ -31,68 +24,21 @@ interface Helper {
 }
 
 /**
- * The helper releases Bandito runs as root. Versions and checksums are pinned
- * so a changed or replaced download is never run.
+ * The helper Bandito runs as root when netleash has no capabilities of its
+ * own. Its version and checksum are pinned so a changed or replaced
+ * download is never run.
  */
 export const HELPERS = {
-  "eltrafico-tc": {
-    binaryName: "eltrafico-tc",
-    fromPath: true,
-    envVar: "TC",
-    version: "2.3.10",
-    builds: {
-      x86_64: {
-        url:
-          "https://github.com/sigmaSd/Eltrafico/releases/download/2.3.10/eltrafico.tar",
-        archiveSha256:
-          "6e7c7706a2c5680eb3f890840d2f29635e2917ed9daa6475c864577a62a3219a",
-        member: "target/release/eltrafico_tc",
-        sha256:
-          "3c9fb3b8a7af6a74efe7211b71f74139857e91211477405264af50430ab69308",
-      },
-    },
-  },
-  "bandwhich": {
-    binaryName: "bandwhich",
-    fromPath: true,
-    envVar: "BANDWHICH",
-    version: "v0.23.1",
-    builds: {
-      x86_64: {
-        url:
-          "https://github.com/imsnif/bandwhich/releases/download/v0.23.1/bandwhich-v0.23.1-x86_64-unknown-linux-gnu.tar.gz",
-        archiveSha256:
-          "0de12665fcd1ecafbed84c372fb8edc568bb9eaffee95f53710b8c0b4c687637",
-        member: "bandwhich",
-        sha256:
-          "d18d24df363458669b9a54ff247356e953e55fa78220736b85eee2da2052f0df",
-      },
-      aarch64: {
-        url:
-          "https://github.com/imsnif/bandwhich/releases/download/v0.23.1/bandwhich-v0.23.1-aarch64-unknown-linux-gnu.tar.gz",
-        archiveSha256:
-          "46311a6e2652fc3fc386c1186baa6b986e925c686237434445b656112358ce4d",
-        member: "bandwhich",
-        sha256:
-          "8783c00b09627ec1644d223bddf0874a90dfa4cfad496fb25a7003f7d95006f5",
-      },
-    },
-  },
-  // Measures and limits in one: replaces the two above where it has a build.
   "netleash": {
     binaryName: "netleash",
-    fromPath: false,
     envVar: "NETLEASH",
-    version: "v0.2.0",
+    version: "v0.2.1",
     builds: {
       x86_64: {
         url:
-          "https://github.com/sigmaSd/netleash/releases/download/v0.2.0/netleash",
-        archiveSha256:
-          "52271ff89ddf8b65f0455cd4378ddb836d7d422d41e5417489b309d9c33203dc",
-        member: null,
+          "https://github.com/sigmaSd/netleash/releases/download/v0.2.1/netleash",
         sha256:
-          "52271ff89ddf8b65f0455cd4378ddb836d7d422d41e5417489b309d9c33203dc",
+          "16db7d7660b99da16f3f340072140bc6a012b5eb32419c5e0deb4e84eb75594b",
       },
     },
   },
@@ -106,16 +52,28 @@ export const CHECKSUM_FAILED = 125;
 /** Root-owned folder holding the checked copies of the helpers. */
 export const VERIFIED_DIR = "/var/lib/bandito/helpers";
 
+/** Quote a value for the shell. */
+function shQuote(value: string): string {
+  return `'${value.replaceAll("'", `'"'"'`)}'`;
+}
+
 /**
- * Runs as root through pkexec. Copies the helper into a root-owned folder,
- * checks the copy against its pinned SHA-256 there, then replaces itself with
- * it. Checking the root-owned copy means the file can't be swapped between
- * the check and the run. Older copies of the same helper are removed.
- * Arguments: helper name, helper path, SHA-256, then the helper's own.
+ * The script pkexec's shell reads on stdin before running a helper. It
+ * copies the helper into a root-owned folder, checks the copy against its
+ * pinned SHA-256 there, then replaces itself with it, so the file can't be
+ * swapped between the check and the run. Older copies are removed. Sent on
+ * stdin rather than with `sh -c` so the password prompt shows a short
+ * command; the helper then reads the rest of stdin.
  */
-export const VERIFY_AND_RUN = `set -eu
-name=$1; src=$2; sum=$3; shift 3
-dir=${VERIFIED_DIR}
+export function verifyAndRunScript(
+  name: string,
+  src: string,
+  sum: string,
+  dir = VERIFIED_DIR,
+): string {
+  return `set -eu
+name=${shQuote(name)}; src=${shQuote(src)}; sum=${shQuote(sum)}
+dir=${shQuote(dir)}
 mkdir -p "$dir"; chmod 755 "$dir"
 dst="$dir/$name-$sum"
 if ! { [ -f "$dst" ] && echo "$sum  $dst" | sha256sum -c --status; }; then
@@ -132,13 +90,15 @@ if ! { [ -f "$dst" ] && echo "$sum  $dst" | sha256sum -c --status; }; then
     [ "$old" = "$dst" ] || rm -f "$old"
   done
 fi
-exec "$dst" "$@"`;
+exec "$dst"
+`;
+}
 
 export type ProgressCallback = (status: string, fraction: number) => void;
 
 export interface BinaryState {
   phase: "checking" | "downloading" | "ready" | "failed";
-  /** What is happening, e.g. "Downloading bandwhich v0.23.1...". */
+  /** What is happening, e.g. "Downloading netleash v0.2.1...". */
   message: string;
   /** Download progress from 0 to 1. */
   fraction: number;
@@ -196,78 +156,45 @@ async function downloadFile(
   }
 }
 
-async function extractTar(file: string, dest: string) {
-  const output = await new Deno.Command("tar", {
-    args: ["-xf", file, "-C", dest],
-  }).output();
-  if (!output.success) {
-    const stderr = new TextDecoder().decode(output.stderr);
-    throw new Error(`The archive could not be extracted.\n${stderr.trim()}`);
-  }
-}
-
 /** The pinned build for this machine, or an error saying there is none. */
 function buildFor(name: BinaryName): Build {
   const helper: Helper = HELPERS[name];
   const build = helper.builds[Deno.build.arch];
   if (!build) {
     throw new Error(
-      `No ${name} build for ${Deno.build.arch}. Install ${name} yourself, ` +
-        `or set ${helper.envVar} to its path.`,
+      `No ${name} build for ${Deno.build.arch} yet. Install ${name} yourself ` +
+        `and give it its capabilities, or set ${helper.envVar} to its path.`,
     );
   }
   return build;
 }
 
-/** Download, check and unpack one helper into the cache. */
+/** Download and check one helper into the cache. */
 async function install(name: BinaryName, onProgress: ProgressCallback) {
   const helper: Helper = HELPERS[name];
   const build = buildFor(name);
   const work = await Deno.makeTempDir({ dir: CACHE_DIR, prefix: ".install-" });
   try {
-    const archive = join(work, "archive");
-    await downloadFile(build.url, archive, (f) => {
+    const program = join(work, helper.binaryName);
+    await downloadFile(build.url, program, (f) => {
       onProgress(`Downloading ${name} ${helper.version}...`, f);
     });
     onProgress(`Checking ${name}...`, 1);
-    if (await sha256(archive) !== build.archiveSha256) {
+    if (await sha256(program) !== build.sha256) {
       throw new Error(
         `The ${name} download doesn't match its pinned checksum, so it wasn't installed.`,
       );
     }
-    const program = build.member === null ? archive : join(work, build.member);
-    if (build.member !== null) await extractTar(archive, work);
-    if (await sha256(program) !== build.sha256) {
-      throw new Error(
-        `The ${name} program doesn't match its pinned checksum, so it wasn't installed.`,
-      );
-    }
     await Deno.chmod(program, 0o755);
     await Deno.rename(program, join(CACHE_DIR, helper.binaryName));
-    // Left by Bandito 3.0.0, which tracked GitHub's latest release.
-    await Deno.remove(join(CACHE_DIR, `${helper.binaryName}.version`))
-      .catch(() => {});
   } finally {
     await Deno.remove(work, { recursive: true }).catch(() => {});
   }
 }
 
-/** Whether a helper is provided outside Bandito's cache. */
-async function providedElsewhere(helper: Helper): Promise<string | null> {
-  if (Deno.env.get(helper.envVar)) return `Set by ${helper.envVar}`;
-  if (!helper.fromPath) return null;
-  const output = await new Deno.Command("which", {
-    args: [helper.binaryName],
-    stdout: "null",
-    stderr: "null",
-  }).output();
-  return output.success ? "Installed" : null;
-}
-
 /**
- * Make sure eltrafico-tc and bandwhich are downloaded and match their pinned
- * checksums, reporting each one's progress. Returns one message per binary
- * that failed.
+ * Make sure the helpers are downloaded and match their pinned checksums,
+ * reporting each one's progress. Returns one message per helper that failed.
  */
 export async function ensureBinaries(
   names: BinaryName[],
@@ -275,21 +202,18 @@ export async function ensureBinaries(
 ): Promise<string[]> {
   const report = (binary: BinaryName, state: BinaryState) =>
     onProgress?.(binary, state);
-  if (isFlatpak()) {
-    for (const name of names) {
-      report(name, { phase: "ready", message: "Included", fraction: 1 });
-    }
-    return [];
-  }
   await ensureDir(CACHE_DIR);
   const errors: string[] = [];
 
   for (const name of names) {
     const helper: Helper = HELPERS[name];
     try {
-      const elsewhere = await providedElsewhere(helper);
-      if (elsewhere) {
-        report(name, { phase: "ready", message: elsewhere, fraction: 1 });
+      if (Deno.env.get(helper.envVar)) {
+        report(name, {
+          phase: "ready",
+          message: `Set by ${helper.envVar}`,
+          fraction: 1,
+        });
         continue;
       }
       report(name, { phase: "checking", message: "Checking…", fraction: 0 });
@@ -317,46 +241,34 @@ export async function ensureBinaries(
   return errors;
 }
 
+/** How to start a helper as root: the command, and what to send on stdin
+ * before anything else. */
+export interface Launch {
+  command: string[];
+  /** The root-side check, for the shell to read first; null for none. */
+  script: string | null;
+}
+
 /**
- * The command that runs a helper as root: through `pkexec`, and from the host
- * when Bandito is a Flatpak. Helpers Bandito downloaded are checked against
- * their pinned checksum as root first; ones set by environment variable,
- * installed on the system or shipped in the Flatpak are run as they are.
+ * Run a helper as root through pkexec (from the host when Bandito is a
+ * Flatpak; the cache path is the same there). The pinned download is
+ * checked as root first. A helper set by its environment variable is run as
+ * it is.
  */
-export function helperCommand(name: BinaryName, args: string[]): string[] {
+export function helperLaunch(name: BinaryName): Launch {
   const helper: Helper = HELPERS[name];
   const pkexec = isFlatpak()
     ? ["flatpak-spawn", "--host", "pkexec"]
     : ["pkexec"];
 
   const envPath = Deno.env.get(helper.envVar);
-  if (envPath) return [...pkexec, envPath, ...args];
+  if (envPath) return { command: [...pkexec, envPath], script: null };
 
-  const flatpakPath = getFlatpakInstallPath();
-  if (flatpakPath) {
-    return [...pkexec, `${flatpakPath}/bin/${helper.binaryName}`, ...args];
-  }
-
+  const build = buildFor(name);
   const cachePath = join(CACHE_DIR, helper.binaryName);
-  const build = helper.builds[Deno.build.arch];
-  try {
-    if (build && Deno.statSync(cachePath).isFile) {
-      return [
-        ...pkexec,
-        "/bin/sh",
-        "-c",
-        VERIFY_AND_RUN,
-        "bandito-helper",
-        name,
-        cachePath,
-        build.sha256,
-        ...args,
-      ];
-    }
-  } catch {
-    // Not downloaded; fall back to the system's copy.
-  }
-
-  if (!helper.fromPath) throw new Error(`${name} hasn't been downloaded.`);
-  return [...pkexec, helper.binaryName, ...args];
+  return {
+    // Shown in the password prompt as "/bin/sh -s netleash".
+    command: [...pkexec, "/bin/sh", "-s", name],
+    script: verifyAndRunScript(name, cachePath, build.sha256),
+  };
 }

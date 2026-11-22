@@ -7,7 +7,7 @@ export type LimitTarget = { kind: "app"; name: string } | { kind: "global" };
 export interface BackendEvents {
   /** One second of traffic per process and per connection. */
   sample(samples: Sample[], connections: ConnectionSample[]): void;
-  /** A program eltrafico can shape, seen even without traffic. */
+  /** An app the backend can limit, seen even without traffic. */
   program(name: string): void;
   /** The monitor or shaper stopped unexpectedly. */
   failure(message: string): void;

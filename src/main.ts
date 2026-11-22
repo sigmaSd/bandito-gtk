@@ -12,7 +12,6 @@ import config from "../deno.json" with { type: "json" };
 import styles from "./styles.css" with { type: "text" };
 import { DemoBackend } from "./backend/demo.ts";
 import { EbpfBackend, netleashPlan } from "./backend/ebpf.ts";
-import { SystemBackend } from "./backend/system.ts";
 import type { Backend } from "./backend/types.ts";
 import {
   loadSettings,
@@ -25,10 +24,8 @@ import { errorPage, InterfacePage, SetupPage } from "./ui/setup_pages.ts";
 import {
   type BinaryName,
   ensureBinaries,
-  helperCommand,
-  HELPERS,
+  helperLaunch,
 } from "./utils/binary_manager.ts";
-import { isFlatpak, resolveFlatpakInstallPath } from "./utils/flatpak.ts";
 import {
   listInterfaces,
   type NetInterface,
@@ -37,20 +34,12 @@ import {
 /** BANDITO_DEMO=1 shows simulated traffic without root or downloads. */
 const DEMO = Deno.env.get("BANDITO_DEMO") === "1";
 /**
- * netleash replaces bandwhich and eltrafico-tc wherever it can run: with
- * its file capabilities, or as the pinned download where a build exists.
- * BANDITO_BACKEND=legacy keeps the two older helpers.
+ * How netleash runs: as the user when it has its file capabilities,
+ * otherwise as the pinned download, checked and run as root through pkexec.
  */
-const NETLEASH = DEMO || Deno.env.get("BANDITO_BACKEND") === "legacy"
-  ? null
-  : netleashPlan(Deno.build.arch in HELPERS.netleash.builds);
+const NETLEASH = DEMO ? null : netleashPlan();
 /** The helpers to download first, if any. */
-const DOWNLOADS: BinaryName[] = DEMO || NETLEASH?.kind === "capable" ||
-    NETLEASH?.kind === "override"
-  ? []
-  : NETLEASH
-  ? ["netleash"]
-  : ["bandwhich", "eltrafico-tc"];
+const DOWNLOADS: BinaryName[] = NETLEASH?.kind === "pinned" ? ["netleash"] : [];
 /** Show the setup page only if getting ready takes longer than this. */
 const SETUP_PAGE_DELAY = 400;
 
@@ -113,7 +102,6 @@ async function start() {
 function prepareHelpers(): Promise<boolean> {
   return new Promise((resolve) => {
     const attempt = async () => {
-      if (isFlatpak()) await resolveFlatpakInstallPath();
       const setup = new SetupPage(DOWNLOADS, attempt);
       const timer = setTimeout(
         () => window.setContent(setup.widget),
@@ -178,15 +166,13 @@ function chooseInterface(): Promise<NetInterface | null> {
 
 async function monitor(iface: NetInterface) {
   const store = new Store();
-  const current: Backend = DEMO
-    ? new DemoBackend()
-    : NETLEASH
+  const current: Backend = NETLEASH
     ? new EbpfBackend(() =>
       NETLEASH.kind === "pinned"
-        ? helperCommand("netleash", [])
-        : NETLEASH.command
+        ? helperLaunch("netleash")
+        : { command: NETLEASH.command, script: null }
     )
-    : new SystemBackend();
+    : new DemoBackend();
   backend = current;
   const view = new MainView({
     window,

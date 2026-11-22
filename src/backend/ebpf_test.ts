@@ -62,7 +62,6 @@ const plan = (overrides: Partial<Parameters<typeof chooseNetleash>[0]>) =>
   chooseNetleash({
     path: null,
     capable: () => false,
-    pinnedBuild: true,
     flatpak: false,
     ...overrides,
   });
@@ -99,7 +98,7 @@ Deno.test("NETLEASH overrides, through pkexec without capabilities", () => {
   });
 });
 
-Deno.test("without a build or in the Flatpak, the older helpers are used", () => {
-  assertEquals(plan({ pinnedBuild: false }), null);
-  assertEquals(plan({ flatpak: true }), null);
+Deno.test("otherwise the pinned download is used, in the Flatpak too", () => {
+  assertEquals(plan({}), { kind: "pinned" });
+  assertEquals(plan({ flatpak: true }), { kind: "pinned" });
 });

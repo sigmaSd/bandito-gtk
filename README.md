@@ -3,8 +3,8 @@
 A modern, GTK4-based bandwidth monitor and traffic shaper for Linux.
 
 Bandito GTK allows you to monitor network traffic per application and apply
-bandwidth limits (download and upload) using `eltrafico-tc` and `bandwhich` as
-backends.
+bandwidth limits (download and upload), over IPv4 and IPv6, with
+[netleash](https://github.com/sigmaSd/netleash) as its eBPF backend.
 
 ![Bandito showing per-app download and upload rates, with limits on Steam and Syncthing](distro/screenshots/main.png)
 
@@ -25,8 +25,8 @@ backends.
   from the menu).
 - **Modern UI:** Built with GTK4 and libadwaita, with real app names and icons
   from your installed applications.
-- **Automatic Dependencies:** Automatically downloads and caches required
-  binaries (`eltrafico-tc`, `bandwhich`) in your XDG cache directory.
+- **Automatic Setup:** Downloads and checks a pinned netleash in your XDG cache
+  directory, or uses yours if it has its capabilities.
 - **Network Switching:** Pick the network on first run and switch from the
   header bar at any time.
 
@@ -89,28 +89,22 @@ Settings and saved limits live in `$XDG_CONFIG_HOME/bandito/settings.json`.
 
 The application relies on:
 
-- [netleash](https://github.com/sigmaSd/netleash) measures and limits traffic on
-  x86_64. Bandito downloads a pinned release, checks its SHA-256, and runs a
-  checked root-owned copy (in `/var/lib/bandito/helpers`) through `pkexec`, so
-  you're asked for your password when monitoring starts. To skip the prompt,
-  install netleash yourself and give it its capabilities once;
-  Bandito then runs it as you:
+- [netleash](https://github.com/sigmaSd/netleash), which measures and limits
+  traffic with eBPF. Two ways to run it:
+  - **As you, with no password prompt:** install netleash and give it its
+    capabilities once. Bandito finds it on your `PATH`:
 
-  ```sh
-  cargo install netleash
-  sudo setcap cap_bpf,cap_net_admin,cap_perfmon+ep ~/.cargo/bin/netleash
-  ```
+    ```sh
+    cargo install netleash
+    sudo setcap cap_bpf,cap_net_admin,cap_perfmon+ep ~/.cargo/bin/netleash
+    ```
 
-- Elsewhere (aarch64, the Flatpak), Bandito uses two older helpers instead,
-  `eltrafico-tc` 2.3.10 and `bandwhich` 0.23.1, downloaded and checked the same
-  way. `BANDITO_BACKEND=legacy` picks them on x86_64 too.
-- `pkexec` (for root privileges when measuring and shaping traffic)
+  - **Otherwise:** Bandito downloads a pinned netleash release (x86_64) and
+    checks its SHA-256. When monitoring starts, `pkexec` asks for your password
+    to run `/bin/sh -s netleash`: a short root script, sent on stdin, copies
+    netleash into `/var/lib/bandito/helpers`, checks the copy and runs it. A
+    changed file in `~/.cache/bandito` is never run as root.
 
-Bandito downloads exact versions of its helpers and checks their SHA-256
-checksums. Before each run, a short root script copies the helper into
-`/var/lib/bandito/helpers`, checks the copy and runs it, so a changed file in
-`~/.cache/bandito` is never run as root. Because of this, the password prompt
-names `/bin/sh`. To use your own builds, install them on your `PATH`, or set
-`TC` and `BANDWHICH` to their paths; those are run as they are.
-
+  `NETLEASH` points Bandito at another netleash binary: run as you if it has the
+  capabilities, otherwise through `pkexec` as it is.
 - GTK4 libraries
