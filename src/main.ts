@@ -11,7 +11,7 @@ import {
 import config from "../deno.json" with { type: "json" };
 import styles from "./styles.css" with { type: "text" };
 import { DemoBackend } from "./backend/demo.ts";
-import { EbpfBackend } from "./backend/ebpf.ts";
+import { EbpfBackend, serviceInstalled } from "./backend/ebpf.ts";
 import { SystemBackend } from "./backend/system.ts";
 import type { Backend } from "./backend/types.ts";
 import {
@@ -31,8 +31,13 @@ import {
 
 /** BANDITO_DEMO=1 shows simulated traffic without root or downloads. */
 const DEMO = Deno.env.get("BANDITO_DEMO") === "1";
-/** BANDITO_BACKEND=ebpf uses bandito-helper (BANDITO_HELPER) instead. */
-const EBPF = Deno.env.get("BANDITO_BACKEND") === "ebpf";
+/**
+ * bandito-helper replaces bandwhich and eltrafico-tc when its system service
+ * is installed, or with BANDITO_BACKEND=ebpf (and BANDITO_HELPER).
+ */
+const EBPF = !DEMO &&
+  (Deno.env.get("BANDITO_BACKEND") === "ebpf" ||
+    (Deno.env.get("BANDITO_BACKEND") !== "legacy" && serviceInstalled()));
 /** Show the setup page only if getting ready takes longer than this. */
 const SETUP_PAGE_DELAY = 400;
 

@@ -1,5 +1,5 @@
-import { assertEquals } from "@std/assert";
-import { convert } from "./ebpf.ts";
+import { assertEquals, assertThrows } from "@std/assert";
+import { convert, helperCommand, INSTALLED_HELPER } from "./ebpf.ts";
 
 Deno.test("helper samples become app, unidentified and connection samples", () => {
   const { samples, connections } = convert({
@@ -56,4 +56,27 @@ Deno.test("no unidentified sample when apps account for everything", () => {
     connections: [],
   });
   assertEquals(samples.map((s) => s.name), ["steam"]);
+});
+
+Deno.test("the installed service is used through its client, without pkexec", () => {
+  assertEquals(
+    helperCommand({ service: true, flatpak: false }),
+    [INSTALLED_HELPER, "--client"],
+  );
+  assertEquals(
+    helperCommand({ service: true, flatpak: true }),
+    ["flatpak-spawn", "--host", INSTALLED_HELPER, "--client"],
+  );
+});
+
+Deno.test("without the service, the helper runs as root through pkexec", () => {
+  assertEquals(
+    helperCommand({
+      helper: "/opt/bandito-helper",
+      service: false,
+      flatpak: false,
+    }),
+    ["pkexec", "/opt/bandito-helper"],
+  );
+  assertThrows(() => helperCommand({ service: false, flatpak: false }));
 });

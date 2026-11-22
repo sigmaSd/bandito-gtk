@@ -62,10 +62,61 @@ export function convert(
   return { samples, connections };
 }
 
+/** Where scripts/install.sh puts bandito-helper and its D-Bus service. */
+export const INSTALLED_HELPER = "/usr/libexec/bandito-helper";
+export const SERVICE_FILE =
+  "/usr/share/dbus-1/system-services/io.github.sigmasd.Bandito.Helper.service";
+
+/** Whether a host path exists, looking outside the sandbox in a Flatpak. */
+function hostPathExists(path: string): boolean {
+  if (!isFlatpak()) {
+    try {
+      Deno.statSync(path);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return new Deno.Command("flatpak-spawn", {
+    args: ["--host", "test", "-e", path],
+    stdout: "null",
+    stderr: "null",
+  }).outputSync().success;
+}
+
+/** Whether bandito-helper is installed as a system service. */
+export function serviceInstalled(): boolean {
+  return hostPathExists(SERVICE_FILE);
+}
+
+/**
+ * The command that runs bandito-helper: its client, as the user, when the
+ * system service is installed (polkit decides, no password at each start);
+ * otherwise the helper itself as root through pkexec.
+ */
+export function helperCommand(
+  options: {
+    helper?: string;
+    service: boolean;
+    flatpak: boolean;
+  },
+): string[] {
+  const host = options.flatpak ? ["flatpak-spawn", "--host"] : [];
+  if (options.service) {
+    return [...host, options.helper ?? INSTALLED_HELPER, "--client"];
+  }
+  if (!options.helper) {
+    throw new Error(
+      "bandito-helper isn't installed; install it or set BANDITO_HELPER.",
+    );
+  }
+  return [...host, "pkexec", options.helper];
+}
+
 /**
  * Measures and limits traffic with bandito-helper, one eBPF program for both
- * jobs. Opt in with BANDITO_BACKEND=ebpf and BANDITO_HELPER set to the
- * helper's path.
+ * jobs. Used when its system service is installed, or with
+ * BANDITO_BACKEND=ebpf and BANDITO_HELPER set to the helper's path.
  */
 export class EbpfBackend implements Backend {
   #process: Deno.ChildProcess | null = null;
@@ -73,13 +124,11 @@ export class EbpfBackend implements Backend {
   #stopping = false;
 
   async start(iface: string, events: BackendEvents): Promise<void> {
-    const helper = Deno.env.get("BANDITO_HELPER");
-    if (!helper) {
-      throw new Error("Set BANDITO_HELPER to bandito-helper's path.");
-    }
-    const [command, ...args] = isFlatpak()
-      ? ["flatpak-spawn", "--host", "pkexec", helper]
-      : ["pkexec", helper];
+    const [command, ...args] = helperCommand({
+      helper: Deno.env.get("BANDITO_HELPER"),
+      service: serviceInstalled(),
+      flatpak: isFlatpak(),
+    });
     const process = new Deno.Command(command, {
       args,
       stdin: "piped",
