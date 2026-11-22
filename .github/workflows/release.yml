@@ -41,7 +41,11 @@ jobs:
       - name: Compile
         if: steps.check_release.outputs.exists == 'false'
         run: |
-          deno compile -A --output bandito-gtk ./src/main.ts
+          for arch in x86_64 aarch64; do
+            deno compile -A --target "$arch-unknown-linux-gnu" --output "bandito-gtk-$arch" ./src/main.ts
+          done
+          # The name releases up to 3.1.1 used for the x86_64 binary.
+          cp bandito-gtk-x86_64 bandito-gtk
 
       - name: Create Release
         if: steps.check_release.outputs.exists == 'false'
@@ -49,7 +53,10 @@ jobs:
         with:
           tag_name: ${{ steps.get_version.outputs.VERSION }}
           name: Release ${{ steps.get_version.outputs.VERSION }}
-          files: bandito-gtk
+          files: |
+            bandito-gtk
+            bandito-gtk-x86_64
+            bandito-gtk-aarch64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

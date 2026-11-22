@@ -34,13 +34,13 @@ bandwidth limits (download and upload), over IPv4 and IPv6, with
 
 ### Binary
 
-You can download the latest pre-compiled binary from the
-[Releases](https://github.com/sigmaSd/bandito-gtk/releases) page.
-
-Once downloaded, make the binary executable:
+Download the binary for your machine, `bandito-gtk-x86_64` or
+`bandito-gtk-aarch64`, from the
+[latest release](https://github.com/sigmaSd/bandito-gtk/releases/latest), then
+make it executable:
 
 ```bash
-chmod +x bandito-gtk
+chmod +x bandito-gtk-x86_64
 ```
 
 ### Flatpak
@@ -58,14 +58,14 @@ flatpak install --user bandito-gtk-<arch>.flatpak
 Run the application:
 
 ```bash
-./bandito-gtk
+./bandito-gtk-x86_64
 ```
 
 If no interface is specified as an argument, a selection window will appear. You
 can also specify the interface directly:
 
 ```bash
-./bandito-gtk wlan0
+./bandito-gtk-x86_64 wlan0
 ```
 
 ## Development

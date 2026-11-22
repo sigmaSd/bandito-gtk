@@ -95,6 +95,11 @@ modules:
               <binary>bandito-gtk</binary>
             </provides>
             <releases>
+              <release version="3.1.2" date="2026-11-22">
+                <description>
+                  <p>A Bandito binary for 64-bit ARM (aarch64) is released alongside the x86_64 one.</p>
+                </description>
+              </release>
               <release version="3.1.1" date="2026-11-22">
                 <description>
                   <p>Bandito measures and limits traffic on 64-bit ARM (aarch64) too.</p>
