@@ -11,6 +11,7 @@ import {
 import config from "../deno.json" with { type: "json" };
 import styles from "./styles.css" with { type: "text" };
 import { DemoBackend } from "./backend/demo.ts";
+import { EbpfBackend } from "./backend/ebpf.ts";
 import { SystemBackend } from "./backend/system.ts";
 import type { Backend } from "./backend/types.ts";
 import {
@@ -30,6 +31,8 @@ import {
 
 /** BANDITO_DEMO=1 shows simulated traffic without root or downloads. */
 const DEMO = Deno.env.get("BANDITO_DEMO") === "1";
+/** BANDITO_BACKEND=ebpf uses bandito-helper (BANDITO_HELPER) instead. */
+const EBPF = Deno.env.get("BANDITO_BACKEND") === "ebpf";
 /** Show the setup page only if getting ready takes longer than this. */
 const SETUP_PAGE_DELAY = 400;
 
@@ -83,7 +86,7 @@ app.onActivate(() => {
 });
 
 async function start() {
-  if (!DEMO && !(await prepareHelpers())) return;
+  if (!DEMO && !EBPF && !(await prepareHelpers())) return;
   const iface = await chooseInterface();
   if (iface) await monitor(iface);
 }
@@ -156,7 +159,11 @@ function chooseInterface(): Promise<NetInterface | null> {
 
 async function monitor(iface: NetInterface) {
   const store = new Store();
-  const current: Backend = DEMO ? new DemoBackend() : new SystemBackend();
+  const current: Backend = DEMO
+    ? new DemoBackend()
+    : EBPF
+    ? new EbpfBackend()
+    : new SystemBackend();
   backend = current;
   const view = new MainView({
     window,
