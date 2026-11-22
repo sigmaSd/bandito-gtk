@@ -2,7 +2,7 @@
   "version": "5",
   "specifiers": {
     "jsr:@sigma/deno-compat@0.25.0": "0.25.0",
-    "jsr:@sigmasd/gtk@0.71": "0.71.0",
+    "jsr:@sigmasd/gtk@0.72": "0.72.0",
     "jsr:@std/assert@^1.0.19": "1.0.19",
     "jsr:@std/bytes@^1.0.6": "1.0.6",
     "jsr:@std/encoding@^1.0.11": "1.0.11",
@@ -17,8 +17,8 @@
     "@sigma/deno-compat@0.25.0": {
       "integrity": "d9fb998ac34ce7b85499c3f655210a18c49624d34657cf0226af4b4395d1fe1f"
     },
-    "@sigmasd/gtk@0.71.0": {
-      "integrity": "0940811114c8ca4136f2aa138056a8d841b6c672742638727c0e7ca3035913fb",
+    "@sigmasd/gtk@0.72.0": {
+      "integrity": "c9396556a59f9a84ddd8c173cb836062d82c6e3a4d5896be34698343c58fcd64",
       "dependencies": [
         "jsr:@sigma/deno-compat"
       ]
@@ -67,7 +67,7 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@sigmasd/gtk@0.71",
+      "jsr:@sigmasd/gtk@0.72",
       "jsr:@std/assert@^1.0.19",
       "jsr:@std/encoding@^1.0.11",
       "jsr:@std/fmt@^1.0.10",

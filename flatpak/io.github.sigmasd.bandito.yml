@@ -137,7 +137,7 @@ modules:
                 <description>
                   <ul>
                     <li>The helper programs Bandito downloads are pinned to exact versions and checked before they run as root</li>
-                    <li>The window responds right away to updates and uses fewer wake-ups while idle, with jsGTK 0.71</li>
+                    <li>The window responds right away to updates and uses fewer wake-ups while idle, with jsGTK 0.72</li>
                   </ul>
                 </description>
               </release>
