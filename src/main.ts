@@ -11,7 +11,7 @@ import {
 import config from "../deno.json" with { type: "json" };
 import styles from "./styles.css" with { type: "text" };
 import { DemoBackend } from "./backend/demo.ts";
-import { EbpfBackend, serviceInstalled } from "./backend/ebpf.ts";
+import { EbpfBackend, netleashPlan } from "./backend/ebpf.ts";
 import { SystemBackend } from "./backend/system.ts";
 import type { Backend } from "./backend/types.ts";
 import {
@@ -22,7 +22,12 @@ import {
 import { Store } from "./model/store.ts";
 import { MainView } from "./ui/main_view.ts";
 import { errorPage, InterfacePage, SetupPage } from "./ui/setup_pages.ts";
-import { ensureBinaries } from "./utils/binary_manager.ts";
+import {
+  type BinaryName,
+  ensureBinaries,
+  helperCommand,
+  HELPERS,
+} from "./utils/binary_manager.ts";
 import { isFlatpak, resolveFlatpakInstallPath } from "./utils/flatpak.ts";
 import {
   listInterfaces,
@@ -32,12 +37,20 @@ import {
 /** BANDITO_DEMO=1 shows simulated traffic without root or downloads. */
 const DEMO = Deno.env.get("BANDITO_DEMO") === "1";
 /**
- * netleash replaces bandwhich and eltrafico-tc when its system service
- * is installed, or with BANDITO_BACKEND=ebpf (and NETLEASH).
+ * netleash replaces bandwhich and eltrafico-tc wherever it can run: with
+ * its file capabilities, or as the pinned download where a build exists.
+ * BANDITO_BACKEND=legacy keeps the two older helpers.
  */
-const EBPF = !DEMO &&
-  (Deno.env.get("BANDITO_BACKEND") === "ebpf" ||
-    (Deno.env.get("BANDITO_BACKEND") !== "legacy" && serviceInstalled()));
+const NETLEASH = DEMO || Deno.env.get("BANDITO_BACKEND") === "legacy"
+  ? null
+  : netleashPlan(Deno.build.arch in HELPERS.netleash.builds);
+/** The helpers to download first, if any. */
+const DOWNLOADS: BinaryName[] = DEMO || NETLEASH?.kind === "capable" ||
+    NETLEASH?.kind === "override"
+  ? []
+  : NETLEASH
+  ? ["netleash"]
+  : ["bandwhich", "eltrafico-tc"];
 /** Show the setup page only if getting ready takes longer than this. */
 const SETUP_PAGE_DELAY = 400;
 
@@ -91,7 +104,7 @@ app.onActivate(() => {
 });
 
 async function start() {
-  if (!DEMO && !EBPF && !(await prepareHelpers())) return;
+  if (DOWNLOADS.length && !(await prepareHelpers())) return;
   const iface = await chooseInterface();
   if (iface) await monitor(iface);
 }
@@ -101,13 +114,14 @@ function prepareHelpers(): Promise<boolean> {
   return new Promise((resolve) => {
     const attempt = async () => {
       if (isFlatpak()) await resolveFlatpakInstallPath();
-      const setup = new SetupPage(attempt);
+      const setup = new SetupPage(DOWNLOADS, attempt);
       const timer = setTimeout(
         () => window.setContent(setup.widget),
         SETUP_PAGE_DELAY,
       );
-      const errors = await ensureBinaries((binary, state) =>
-        setup.update(binary, state)
+      const errors = await ensureBinaries(
+        DOWNLOADS,
+        (binary, state) => setup.update(binary, state),
       );
       clearTimeout(timer);
       if (errors.length === 0) resolve(true);
@@ -166,8 +180,12 @@ async function monitor(iface: NetInterface) {
   const store = new Store();
   const current: Backend = DEMO
     ? new DemoBackend()
-    : EBPF
-    ? new EbpfBackend()
+    : NETLEASH
+    ? new EbpfBackend(() =>
+      NETLEASH.kind === "pinned"
+        ? helperCommand("netleash", [])
+        : NETLEASH.command
+    )
     : new SystemBackend();
   backend = current;
   const view = new MainView({

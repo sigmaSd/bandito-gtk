@@ -12,14 +12,18 @@ interface Build {
   url: string;
   /** SHA-256 of the downloaded archive. */
   archiveSha256: string;
-  /** Path of the program inside the archive. */
-  member: string;
+  /** Path of the program inside the archive; null when the download is the
+   * program itself. */
+  member: string | null;
   /** SHA-256 of the program itself, checked again as root before each run. */
   sha256: string;
 }
 
 interface Helper {
   binaryName: string;
+  /** Whether a copy on the PATH may be run through pkexec. Not for
+   * netleash: `cargo install` puts it in a user-writable directory. */
+  fromPath: boolean;
   /** Environment variable that points at a program to use instead. */
   envVar: string;
   version: string;
@@ -33,6 +37,7 @@ interface Helper {
 export const HELPERS = {
   "eltrafico-tc": {
     binaryName: "eltrafico-tc",
+    fromPath: true,
     envVar: "TC",
     version: "2.3.10",
     builds: {
@@ -49,6 +54,7 @@ export const HELPERS = {
   },
   "bandwhich": {
     binaryName: "bandwhich",
+    fromPath: true,
     envVar: "BANDWHICH",
     version: "v0.23.1",
     builds: {
@@ -69,6 +75,24 @@ export const HELPERS = {
         member: "bandwhich",
         sha256:
           "8783c00b09627ec1644d223bddf0874a90dfa4cfad496fb25a7003f7d95006f5",
+      },
+    },
+  },
+  // Measures and limits in one: replaces the two above where it has a build.
+  "netleash": {
+    binaryName: "netleash",
+    fromPath: false,
+    envVar: "NETLEASH",
+    version: "v0.1.0",
+    builds: {
+      x86_64: {
+        url:
+          "https://github.com/sigmaSd/netleash/releases/download/v0.1.0/netleash",
+        archiveSha256:
+          "cfdf3470c2850c092d5919bf2ebdcca7c61757dc307e7e135a94d4b76cef7748",
+        member: null,
+        sha256:
+          "cfdf3470c2850c092d5919bf2ebdcca7c61757dc307e7e135a94d4b76cef7748",
       },
     },
   },
@@ -211,8 +235,8 @@ async function install(name: BinaryName, onProgress: ProgressCallback) {
         `The ${name} download doesn't match its pinned checksum, so it wasn't installed.`,
       );
     }
-    await extractTar(archive, work);
-    const program = join(work, build.member);
+    const program = build.member === null ? archive : join(work, build.member);
+    if (build.member !== null) await extractTar(archive, work);
     if (await sha256(program) !== build.sha256) {
       throw new Error(
         `The ${name} program doesn't match its pinned checksum, so it wasn't installed.`,
@@ -231,6 +255,7 @@ async function install(name: BinaryName, onProgress: ProgressCallback) {
 /** Whether a helper is provided outside Bandito's cache. */
 async function providedElsewhere(helper: Helper): Promise<string | null> {
   if (Deno.env.get(helper.envVar)) return `Set by ${helper.envVar}`;
+  if (!helper.fromPath) return null;
   const output = await new Deno.Command("which", {
     args: [helper.binaryName],
     stdout: "null",
@@ -245,11 +270,11 @@ async function providedElsewhere(helper: Helper): Promise<string | null> {
  * that failed.
  */
 export async function ensureBinaries(
+  names: BinaryName[],
   onProgress?: (binary: BinaryName, state: BinaryState) => void,
 ): Promise<string[]> {
   const report = (binary: BinaryName, state: BinaryState) =>
     onProgress?.(binary, state);
-  const names = Object.keys(HELPERS) as BinaryName[];
   if (isFlatpak()) {
     for (const name of names) {
       report(name, { phase: "ready", message: "Included", fraction: 1 });
@@ -332,5 +357,6 @@ export function helperCommand(name: BinaryName, args: string[]): string[] {
     // Not downloaded; fall back to the system's copy.
   }
 
+  if (!helper.fromPath) throw new Error(`${name} hasn't been downloaded.`);
   return [...pkexec, helper.binaryName, ...args];
 }

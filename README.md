@@ -89,14 +89,24 @@ Settings and saved limits live in `$XDG_CONFIG_HOME/bandito/settings.json`.
 
 The application relies on:
 
-- [netleash](https://github.com/sigmaSd/netleash), optional: when its service is
-  installed (`cargo install netleash && sudo ~/.cargo/bin/netleash --install`),
-  Bandito measures and limits through it, with IPv6 limits and no password
-  prompt at each start. Otherwise it uses the two helpers below.
-- `pkexec` (for root privileges when measuring and shaping traffic)
-- `eltrafico-tc` 2.3.10 and `bandwhich` 0.23.1, downloaded automatically
+- [netleash](https://github.com/sigmaSd/netleash) measures and limits traffic on
+  x86_64. Bandito downloads a pinned release, checks its SHA-256, and runs a
+  checked root-owned copy (in `/var/lib/bandito/helpers`) through `pkexec`, so
+  you're asked for your password when monitoring starts. To skip the prompt,
+  install netleash 0.2.0 or later yourself and give it its capabilities once;
+  Bandito then runs it as you:
 
-Bandito downloads exact versions of the two helpers and checks their SHA-256
+  ```sh
+  cargo install netleash
+  sudo setcap cap_bpf,cap_net_admin,cap_perfmon+ep ~/.cargo/bin/netleash
+  ```
+
+- Elsewhere (aarch64, the Flatpak), Bandito uses two older helpers instead,
+  `eltrafico-tc` 2.3.10 and `bandwhich` 0.23.1, downloaded and checked the same
+  way. `BANDITO_BACKEND=legacy` picks them on x86_64 too.
+- `pkexec` (for root privileges when measuring and shaping traffic)
+
+Bandito downloads exact versions of its helpers and checks their SHA-256
 checksums. Before each run, a short root script copies the helper into
 `/var/lib/bandito/helpers`, checks the copy and runs it, so a changed file in
 `~/.cache/bandito` is never run as root. Because of this, the password prompt

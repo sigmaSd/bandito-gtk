@@ -101,23 +101,28 @@ class StepRow {
 /** Downloads the helpers, then explains the password prompt that follows. */
 export class SetupPage {
   readonly widget: Widget;
-  #steps: Record<BinaryName, StepRow>;
+  #steps: Partial<Record<BinaryName, StepRow>>;
   #access: StepRow;
   #retry: Button;
 
-  constructor(onRetry: () => void) {
+  constructor(helpers: BinaryName[], onRetry: () => void) {
     const box = new Box(Orientation.VERTICAL, 18);
     const group = new PreferencesGroup();
-    this.#steps = {
-      "bandwhich": new StepRow("Traffic monitor", "bandwhich"),
-      "eltrafico-tc": new StepRow("Traffic shaper", "eltrafico-tc"),
+    const titles: Record<BinaryName, string> = {
+      "bandwhich": "Traffic monitor",
+      "eltrafico-tc": "Traffic shaper",
+      "netleash": "Traffic monitor and limiter",
     };
+    this.#steps = {};
+    for (const helper of helpers) {
+      const step = new StepRow(titles[helper], helper);
+      this.#steps[helper] = step;
+      group.add(step.row);
+    }
     this.#access = new StepRow(
       "Administrator access",
       "Requested after the downloads finish",
     );
-    group.add(this.#steps.bandwhich.row);
-    group.add(this.#steps["eltrafico-tc"].row);
     group.add(this.#access.row);
     box.append(group);
 
@@ -135,13 +140,15 @@ export class SetupPage {
     this.widget = page(
       "security-high-symbolic",
       "Getting Ready",
-      "Measuring and limiting traffic per app needs two small helpers and administrator access. You'll be asked for your password when monitoring starts.",
+      `Measuring and limiting traffic per app needs ${
+        helpers.length === 1 ? "a small helper" : "two small helpers"
+      } and administrator access. You'll be asked for your password when monitoring starts.`,
       box,
     );
   }
 
   update(binary: BinaryName, state: BinaryState) {
-    this.#steps[binary].set(state);
+    this.#steps[binary]?.set(state);
   }
 
   /** Show that downloads failed and offer to try again. */

@@ -1,5 +1,5 @@
-import { assertEquals, assertThrows } from "@std/assert";
-import { convert, helperCommand, INSTALLED_NETLEASH } from "./ebpf.ts";
+import { assertEquals } from "@std/assert";
+import { chooseNetleash, convert } from "./ebpf.ts";
 
 Deno.test("helper samples become app, unidentified and connection samples", () => {
   const { samples, connections } = convert({
@@ -58,25 +58,48 @@ Deno.test("no unidentified sample when apps account for everything", () => {
   assertEquals(samples.map((s) => s.name), ["steam"]);
 });
 
-Deno.test("the installed service is used through its client, without pkexec", () => {
+const plan = (overrides: Partial<Parameters<typeof chooseNetleash>[0]>) =>
+  chooseNetleash({
+    path: null,
+    capable: () => false,
+    pinnedBuild: true,
+    flatpak: false,
+    ...overrides,
+  });
+
+Deno.test("a netleash with its capabilities runs as the user", () => {
   assertEquals(
-    helperCommand({ service: true, flatpak: false }),
-    [INSTALLED_NETLEASH, "--client"],
+    plan({ path: "/home/u/.cargo/bin/netleash", capable: () => true }),
+    { kind: "capable", command: ["/home/u/.cargo/bin/netleash"] },
   );
   assertEquals(
-    helperCommand({ service: true, flatpak: true }),
-    ["flatpak-spawn", "--host", INSTALLED_NETLEASH, "--client"],
+    plan({ path: "/usr/bin/netleash", capable: () => true, flatpak: true }),
+    {
+      kind: "capable",
+      command: ["flatpak-spawn", "--host", "/usr/bin/netleash"],
+    },
   );
 });
 
-Deno.test("without the service, the helper runs as root through pkexec", () => {
-  assertEquals(
-    helperCommand({
-      helper: "/opt/netleash",
-      service: false,
-      flatpak: false,
-    }),
-    ["pkexec", "/opt/netleash"],
-  );
-  assertThrows(() => helperCommand({ service: false, flatpak: false }));
+Deno.test("a netleash without capabilities on the PATH is never run as root", () => {
+  // It may be user-writable (~/.cargo/bin): use the checked download instead.
+  assertEquals(plan({ path: "/home/u/.cargo/bin/netleash" }), {
+    kind: "pinned",
+  });
+});
+
+Deno.test("NETLEASH overrides, through pkexec without capabilities", () => {
+  assertEquals(plan({ env: "/tmp/netleash" }), {
+    kind: "override",
+    command: ["pkexec", "/tmp/netleash"],
+  });
+  assertEquals(plan({ env: "/tmp/netleash", capable: () => true }), {
+    kind: "capable",
+    command: ["/tmp/netleash"],
+  });
+});
+
+Deno.test("without a build or in the Flatpak, the older helpers are used", () => {
+  assertEquals(plan({ pinnedBuild: false }), null);
+  assertEquals(plan({ flatpak: true }), null);
 });

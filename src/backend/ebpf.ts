@@ -62,73 +62,104 @@ export function convert(
   return { samples, connections };
 }
 
-/** Where `netleash --install` puts netleash and its D-Bus service. */
-export const INSTALLED_NETLEASH = "/usr/bin/netleash";
-export const SERVICE_FILE =
-  "/usr/share/dbus-1/system-services/io.github.sigmasd.Netleash.service";
+/** How Bandito runs netleash. */
+export type NetleashPlan =
+  /** A netleash with its file capabilities: run as the user, no prompt. */
+  | { kind: "capable"; command: string[] }
+  /** NETLEASH set to a binary without them: run it through pkexec. */
+  | { kind: "override"; command: string[] }
+  /** Download the pinned netleash, check it, run it as root via pkexec. */
+  | { kind: "pinned" };
 
-/** Whether a host path exists, looking outside the sandbox in a Flatpak. */
-function hostPathExists(path: string): boolean {
-  if (!isFlatpak()) {
-    try {
-      Deno.statSync(path);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  return new Deno.Command("flatpak-spawn", {
-    args: ["--host", "test", "-e", path],
-    stdout: "null",
-    stderr: "null",
-  }).outputSync().success;
+/** Run a command on the host, outside the Flatpak sandbox if in one. */
+function onHost(args: string[]): string[] {
+  return isFlatpak() ? ["flatpak-spawn", "--host", ...args] : args;
 }
 
-/** Whether netleash is installed as a system service. */
-export function serviceInstalled(): boolean {
-  return hostPathExists(SERVICE_FILE);
+/** Whether a netleash binary can run without root (`netleash --capable`). */
+function capable(path: string): boolean {
+  try {
+    const [command, ...args] = onHost([path, "--capable"]);
+    return new Deno.Command(command, {
+      args,
+      stdin: "null",
+      stdout: "null",
+      stderr: "null",
+    }).outputSync().success;
+  } catch {
+    return false;
+  }
+}
+
+/** netleash on the host's PATH, if any. */
+function onPath(): string | null {
+  try {
+    const [command, ...args] = onHost(["sh", "-c", "command -v netleash"]);
+    const output = new Deno.Command(command, { args, stderr: "null" })
+      .outputSync();
+    const path = new TextDecoder().decode(output.stdout).trim();
+    return output.success && path ? path : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
- * The command that runs netleash: its client, as the user, when the
- * system service is installed (polkit decides, no password at each start);
- * otherwise the helper itself as root through pkexec.
+ * How to run netleash, or null to use bandwhich and eltrafico-tc. In order:
+ * NETLEASH; a netleash with its capabilities on the PATH; the pinned
+ * download where a build exists. A netleash without capabilities on the
+ * PATH is never run through pkexec: it may sit in a user-writable directory
+ * such as ~/.cargo/bin, which is why the pinned copy is checked as root
+ * before it runs.
  */
-export function helperCommand(
-  options: {
-    helper?: string;
-    service: boolean;
-    flatpak: boolean;
-  },
-): string[] {
-  const host = options.flatpak ? ["flatpak-spawn", "--host"] : [];
-  if (options.service) {
-    return [...host, options.helper ?? INSTALLED_NETLEASH, "--client"];
+export function chooseNetleash(options: {
+  env?: string;
+  path: string | null;
+  capable: (path: string) => boolean;
+  pinnedBuild: boolean;
+  flatpak: boolean;
+}): NetleashPlan | null {
+  const host = (args: string[]) =>
+    options.flatpak ? ["flatpak-spawn", "--host", ...args] : args;
+  if (options.env) {
+    return options.capable(options.env)
+      ? { kind: "capable", command: host([options.env]) }
+      : { kind: "override", command: host(["pkexec", options.env]) };
   }
-  if (!options.helper) {
-    throw new Error(
-      "netleash isn't installed; run `sudo netleash --install`, or set NETLEASH.",
-    );
+  if (options.path && options.capable(options.path)) {
+    return { kind: "capable", command: host([options.path]) };
   }
-  return [...host, "pkexec", options.helper];
+  if (options.pinnedBuild && !options.flatpak) return { kind: "pinned" };
+  return null;
+}
+
+/** chooseNetleash() for this machine. */
+export function netleashPlan(pinnedBuild: boolean): NetleashPlan | null {
+  return chooseNetleash({
+    env: Deno.env.get("NETLEASH"),
+    path: onPath(),
+    capable,
+    pinnedBuild,
+    flatpak: isFlatpak(),
+  });
 }
 
 /**
  * Measures and limits traffic with netleash, one eBPF program for both
- * jobs. Used when its system service is installed, or with
- * BANDITO_BACKEND=ebpf and NETLEASH set to its path.
+ * jobs, run by the command `commandLine` gives when monitoring starts.
  */
 export class EbpfBackend implements Backend {
   #process: Deno.ChildProcess | null = null;
   #writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
   #stopping = false;
+  readonly #commandLine: () => string[];
+
+  constructor(commandLine: () => string[]) {
+    this.#commandLine = commandLine;
+  }
 
   async start(iface: string, events: BackendEvents): Promise<void> {
-    const [command, ...args] = helperCommand({
-      helper: Deno.env.get("NETLEASH"),
-      service: serviceInstalled(),
-      flatpak: isFlatpak(),
-    });
+    const [command, ...args] = this.#commandLine();
     const process = new Deno.Command(command, {
       args,
       stdin: "piped",
