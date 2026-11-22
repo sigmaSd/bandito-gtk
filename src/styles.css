@@ -1,83 +1,187 @@
-.main-container {
-  background-color: @window_bg_color;
+/* Rates: teal for download, orange for upload, with arrows so colour is never the only cue. */
+.rate-download,
+.total-download {
+  color: #0f7b84;
 }
-.header-cell {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: @theme_fg_color;
-  font-family: monospace;
-  padding: 6px 8px;
-  letter-spacing: 0.05em;
-  background-color: @headerbar_bg_color;
-  border-bottom: 2px solid @headerbar_border_color;
+.rate-upload,
+.total-upload {
+  color: #b44700;
 }
-.global-row {
-  background-color: rgba(241, 196, 15, 0.12);
+.palette-dark .rate-download,
+.palette-dark .total-download {
+  color: #5fd3da;
 }
-.global-cell {
-  font-weight: 700;
-  font-size: 1rem;
-  padding: 4px 10px;
-  letter-spacing: 0.02em;
+.palette-dark .rate-upload,
+.palette-dark .total-upload {
+  color: #ffa152;
 }
-.app-row-even {
-  background-color: transparent;
-}
-.app-row-odd {
-  background-color: rgba(128, 128, 128, 0.04);
-}
-.app-cell {
-  font-size: 0.95rem;
-  padding: 4px 10px;
-}
-.app-name {
+
+.rate {
   font-weight: 600;
 }
-.rate-cell {
-  font-family: monospace;
-  font-size: 0.95rem;
+.rate.zero {
+  color: alpha(currentColor, 0.45);
+  font-weight: 400;
+}
+
+.total-download {
+  font-size: 22pt;
+  font-weight: 800;
+}
+.total-upload {
+  font-size: 14pt;
   font-weight: 700;
-  padding: 0 8px;
 }
-.dl-rate {
-  color: #2ecc71;
+.chart-label {
+  font-size: 8pt;
+  margin: 0 2px;
 }
-.ul-rate {
-  color: #3498db;
+
+/* Summary card for the all-apps limit */
+.global-card {
+  padding: 12px 14px;
 }
-.limit-cell {
-  padding: 2px 4px;
+
+/* List */
+.list-header {
+  margin-bottom: 2px;
 }
-.limit-display {
-  font-family: monospace;
-  font-size: 0.9rem;
+.sort-button {
   padding: 2px 6px;
-  border: 1px solid transparent;
-  border-radius: 3px;
+  min-height: 0;
+  font-size: 9pt;
+  font-weight: 400;
 }
-.limit-display:hover {
-  border-color: rgba(128, 128, 128, 0.3);
-  background-color: rgba(128, 128, 128, 0.05);
+.sort-button.sorted {
+  font-weight: 700;
 }
-.limit-entry {
-  font-family: monospace;
-  font-size: 0.9rem;
-  min-height: 20px;
+.app-title {
+  font-weight: 600;
 }
-.limit-unit {
-  font-family: monospace;
-  font-size: 0.85rem;
-  color: @theme_dim_color;
-  padding: 0 2px;
+.app-row.idle {
+  opacity: 0.6;
 }
-.check-cell {
-  padding: 2px 4px;
+.app-row.editing {
+  background-color: alpha(currentColor, 0.06);
 }
-.check-cell checkbutton {
-  min-width: 16px;
-  min-height: 16px;
+.idle-toggle {
+  padding: 10px 14px;
+  border-radius: 12px;
 }
-.check-cell checkbutton check {
-  min-width: 14px;
-  min-height: 14px;
+
+/* Placeholder icons for programs without one */
+.app-tile {
+  border-radius: 8px;
+  color: white;
+  font-weight: 800;
+  font-size: 13pt;
+}
+.app-tile.unknown {
+  color: alpha(currentColor, 0.7);
+  border: 1.5px solid alpha(currentColor, 0.45);
+  border-radius: 999px;
+}
+.app-tile.global-tile {
+  background-color: #3584e4;
+  border-radius: 11px;
+}
+.tile-0 {
+  background-color: #1c71d8;
+}
+.tile-1 {
+  background-color: #26a269;
+}
+.tile-2 {
+  background-color: #c64600;
+}
+.tile-3 {
+  background-color: #813d9c;
+}
+.tile-4 {
+  background-color: #5e5c64;
+}
+.tile-5 {
+  background-color: #1a7f86;
+}
+
+/* Limit chips: blue while idle, orange while throttling */
+.limit-chip {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 9pt;
+  font-weight: 700;
+  background-color: #dde9fa;
+  color: #1a5fb4;
+}
+.limit-chip.throttled {
+  background-color: #fbe7d3;
+  color: #9a3a00;
+}
+.palette-dark .limit-chip {
+  background-color: #24364f;
+  color: #9cc4f5;
+}
+.palette-dark .limit-chip.throttled {
+  background-color: #4a2d16;
+  color: #ffbe85;
+}
+.limit-hint {
+  font-size: 9pt;
+  font-weight: 600;
+  color: #1c71d8;
+  opacity: 0;
+}
+.palette-dark .limit-hint {
+  color: #78aeed;
+}
+row:hover .limit-hint,
+row:focus-visible .limit-hint {
+  opacity: 1;
+}
+
+/* Limit editor */
+.limit-panel {
+  background-color: @sidebar_bg_color;
+}
+.panel-live {
+  font-weight: 600;
+  font-size: 10pt;
+}
+.panel-footer {
+  padding: 12px 16px 16px;
+  border-top: 1px solid alpha(currentColor, 0.1);
+}
+.preset {
+  padding: 3px 10px;
+  min-height: 0;
+  border-radius: 999px;
+  font-size: 9pt;
+}
+.preset.selected {
+  background-color: #dde9fa;
+  color: #1a5fb4;
+  font-weight: 700;
+}
+.palette-dark .preset.selected {
+  background-color: #24364f;
+  color: #9cc4f5;
+}
+
+/* Menus built from buttons */
+.menu-item {
+  padding: 6px 10px;
+  font-weight: 400;
+}
+.menu-item > label {
+  margin-right: 24px;
+}
+
+/* First run */
+.badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 8pt;
+  font-weight: 700;
+  background-color: alpha(#3584e4, 0.18);
+  color: #1c71d8;
 }

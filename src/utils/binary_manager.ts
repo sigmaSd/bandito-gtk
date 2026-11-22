@@ -206,46 +206,96 @@ export async function checkMissingBinaries(): Promise<boolean> {
   return missing;
 }
 
+export type BinaryName = keyof typeof BINARIES;
+
+export interface BinaryState {
+  phase: "checking" | "downloading" | "ready" | "failed";
+  /** What is happening, e.g. "Downloading bandwhich v0.23.1...". */
+  message: string;
+  /** Download progress from 0 to 1. */
+  fraction: number;
+}
+
+/**
+ * Make sure eltrafico-tc and bandwhich are installed and current, reporting
+ * each one's progress. Returns one message per binary that failed.
+ */
 export async function ensureBinaries(
-  onProgress?: ProgressCallback,
+  onProgress?: (binary: BinaryName, state: BinaryState) => void,
 ): Promise<string[]> {
-  if (isFlatpak()) return [];
+  const report = (binary: BinaryName, state: BinaryState) =>
+    onProgress?.(binary, state);
+  const names = Object.keys(BINARIES) as BinaryName[];
+  if (isFlatpak()) {
+    for (const name of names) {
+      report(name, { phase: "ready", message: "Included", fraction: 1 });
+    }
+    return [];
+  }
   await ensureDir(CACHE_DIR);
   const errors: string[] = [];
 
-  for (const [key, config] of Object.entries(BINARIES)) {
-    const name = key as keyof typeof BINARIES;
+  for (const name of names) {
+    const config = BINARIES[name];
     const finalPath = join(CACHE_DIR, config.binaryName);
 
-    if (Deno.env.get(config.envVar)) continue;
+    if (Deno.env.get(config.envVar)) {
+      report(name, {
+        phase: "ready",
+        message: "Set by " + config.envVar,
+        fraction: 1,
+      });
+      continue;
+    }
 
     const command = new Deno.Command("which", { args: [config.binaryName] });
     const output = await command.output();
-    if (output.success) continue;
+    if (output.success) {
+      report(name, { phase: "ready", message: "Installed", fraction: 1 });
+      continue;
+    }
 
     try {
       const versionFile = join(CACHE_DIR, `${config.binaryName}.version`);
       const currentVersion = await exists(versionFile)
-        ? await Deno.readTextFile(versionFile)
+        ? (await Deno.readTextFile(versionFile)).trim()
         : null;
 
-      if (onProgress) onProgress(`Checking ${name}...`, 0);
-      const info = await getLatestRelease(config.repo);
-
-      if (currentVersion !== info.tag_name || !(await exists(finalPath))) {
-        if (name === "eltrafico-tc") {
-          await installEltraficoTc(info.tag_name, onProgress);
-        } else {
-          await installBandwhich(info.tag_name, onProgress);
-        }
-      } else {
-        if (onProgress) onProgress(`${name} is up to date`, 0);
+      report(name, {
+        phase: "checking",
+        message: "Checking for updates…",
+        fraction: 0,
+      });
+      let info: ReleaseInfo | null = null;
+      try {
+        info = await getLatestRelease(config.repo);
+      } catch (e) {
+        // Offline is fine when a copy is already downloaded.
+        if (!(await exists(finalPath))) throw e;
       }
+
+      if (
+        info && (currentVersion !== info.tag_name || !(await exists(finalPath)))
+      ) {
+        const progress: ProgressCallback = (message, fraction) =>
+          report(name, { phase: "downloading", message, fraction });
+        if (name === "eltrafico-tc") {
+          await installEltraficoTc(info.tag_name, progress);
+        } else {
+          await installBandwhich(info.tag_name, progress);
+        }
+      }
+      const version = info?.tag_name ?? currentVersion;
+      report(name, {
+        phase: "ready",
+        message: version ? `Version ${version}` : "Downloaded",
+        fraction: 1,
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error(`Failed to update/install ${name}:`, e);
       errors.push(`${name}: ${msg}`);
-      if (onProgress) onProgress(`Failed to install ${name}: ${msg}`, 0);
+      report(name, { phase: "failed", message: msg, fraction: 0 });
     }
   }
   return errors;

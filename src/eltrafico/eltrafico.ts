@@ -1,6 +1,6 @@
 import { getBinaryPath } from "../utils/binary_manager.ts";
 import { isFlatpak } from "../utils/flatpak.ts";
-import type { Unit } from "../types.ts";
+import type { Unit } from "../model/units.ts";
 
 export interface Program {
   name?: string;
@@ -122,6 +122,10 @@ export class ElTrafico {
   }
   async wait() {
     return await this.#tc.status;
+  }
+  /** Whether the shaper stopped on its own, e.g. after a refused password. */
+  get closed() {
+    return this.#isClosed;
   }
   kill() {
     this.#isClosed = true;
