@@ -99,11 +99,11 @@ The application relies on:
     sudo setcap cap_bpf,cap_net_admin,cap_perfmon+ep ~/.cargo/bin/netleash
     ```
 
-  - **Otherwise:** Bandito downloads a pinned netleash release (x86_64) and
-    checks its SHA-256. When monitoring starts, `pkexec` asks for your password
-    to run `/bin/sh -s netleash`: a short root script, sent on stdin, copies
-    netleash into `/var/lib/bandito/helpers`, checks the copy and runs it. A
-    changed file in `~/.cache/bandito` is never run as root.
+  - **Otherwise:** Bandito downloads a pinned netleash release (x86_64 or
+    aarch64) and checks its SHA-256. When monitoring starts, `pkexec` asks for
+    your password to run `/bin/sh -s netleash`: a short root script, sent on
+    stdin, copies netleash into `/var/lib/bandito/helpers`, checks the copy and
+    runs it. A changed file in `~/.cache/bandito` is never run as root.
 
   `NETLEASH` points Bandito at another netleash binary: run as you if it has the
   capabilities, otherwise through `pkexec` as it is.

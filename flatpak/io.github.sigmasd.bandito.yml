@@ -95,6 +95,11 @@ modules:
               <binary>bandito-gtk</binary>
             </provides>
             <releases>
+              <release version="3.1.1" date="2026-11-22">
+                <description>
+                  <p>Bandito measures and limits traffic on 64-bit ARM (aarch64) too.</p>
+                </description>
+              </release>
               <release version="3.1.0" date="2026-11-22">
                 <description>
                   <p>Bandito now measures and limits traffic with netleash, one eBPF helper.</p>

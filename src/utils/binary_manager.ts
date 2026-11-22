@@ -36,9 +36,15 @@ export const HELPERS = {
     builds: {
       x86_64: {
         url:
-          "https://github.com/sigmaSd/netleash/releases/download/v0.2.1/netleash",
+          "https://github.com/sigmaSd/netleash/releases/download/v0.2.1/netleash-x86_64",
         sha256:
           "16db7d7660b99da16f3f340072140bc6a012b5eb32419c5e0deb4e84eb75594b",
+      },
+      aarch64: {
+        url:
+          "https://github.com/sigmaSd/netleash/releases/download/v0.2.1/netleash-aarch64",
+        sha256:
+          "16443991d1bf3f5a504a77557d12c84a7afec29dfb513699f8ab40863f68ecf3",
       },
     },
   },
