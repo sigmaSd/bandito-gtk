@@ -113,6 +113,8 @@ jobs:
             artifacts/bandito-gtk-aarch64.flatpak
           draft: false
           prerelease: false
+          # Keep "Latest" on the versioned release, not on every build.
+          make_latest: false
           generate_release_notes: true
           body: |
             Automated build from commit ${{ github.sha }}
