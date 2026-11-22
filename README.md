@@ -93,7 +93,7 @@ The application relies on:
   x86_64. Bandito downloads a pinned release, checks its SHA-256, and runs a
   checked root-owned copy (in `/var/lib/bandito/helpers`) through `pkexec`, so
   you're asked for your password when monitoring starts. To skip the prompt,
-  install netleash 0.2.0 or later yourself and give it its capabilities once;
+  install netleash yourself and give it its capabilities once;
   Bandito then runs it as you:
 
   ```sh
