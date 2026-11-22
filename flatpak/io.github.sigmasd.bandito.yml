@@ -81,15 +81,7 @@ modules:
           EOF
 
       # Install icon
-      - mkdir -p /app/share/icons/hicolor/scalable/apps/
-      - |
-          cat > /app/share/icons/hicolor/scalable/apps/io.github.sigmasd.bandito.svg << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
-            <rect width="128" height="128" fill="#33d17a" rx="16"/>
-            <text x="64" y="88" text-anchor="middle" font-family="sans-serif" font-size="56" fill="white" font-weight="bold">B</text>
-          </svg>
-          EOF
+      - install -Dm644 distro/io.github.sigmasd.bandito.svg /app/share/icons/hicolor/scalable/apps/io.github.sigmasd.bandito.svg
 
       # Install metainfo
       - mkdir -p /app/share/metainfo/
@@ -104,10 +96,33 @@ modules:
             <summary>Network bandwidth monitor and traffic shaper</summary>
             <description>
               <p>
-                Bandito GTK is a graphical tool for monitoring per-application network bandwidth usage
-                and applying traffic shaping rules using eltrafico-tc and bandwhich as backends.
+                Bandito GTK shows how much each application downloads and uploads, and lets you
+                limit any of them, or all of them at once. It uses bandwhich to measure traffic
+                and eltrafico-tc to shape it.
               </p>
+              <ul>
+                <li>Live rates and a short history for every application</li>
+                <li>Download and upload limits per application, remembered across restarts</li>
+                <li>The hosts and services each application is talking to</li>
+                <li>Switch between networks from the header bar</li>
+              </ul>
             </description>
+            <screenshots>
+              <screenshot type="default">
+                <caption>Traffic per application, with limits on two of them</caption>
+                <image>https://raw.githubusercontent.com/sigmaSd/bandito-gtk/3.0.0/distro/screenshots/main.png</image>
+              </screenshot>
+              <screenshot>
+                <caption>Limiting an application and seeing its connections</caption>
+                <image>https://raw.githubusercontent.com/sigmaSd/bandito-gtk/3.0.0/distro/screenshots/limits.png</image>
+              </screenshot>
+              <screenshot>
+                <caption>Traffic that couldn't be matched to a program, in dark mode</caption>
+                <image>https://raw.githubusercontent.com/sigmaSd/bandito-gtk/3.0.0/distro/screenshots/unidentified-dark.png</image>
+              </screenshot>
+            </screenshots>
+            <url type="homepage">https://github.com/sigmaSd/bandito-gtk</url>
+            <url type="bugtracker">https://github.com/sigmaSd/bandito-gtk/issues</url>
             <launchable type="desktop-id">io.github.sigmasd.bandito.desktop</launchable>
             <categories>
               <category>System</category>
@@ -118,6 +133,19 @@ modules:
               <binary>bandito-gtk</binary>
             </provides>
             <releases>
+              <release version="3.0.0" date="2026-11-22">
+                <description>
+                  <p>A redesign of the whole application.</p>
+                  <ul>
+                    <li>A summary of total traffic with a one-minute chart</li>
+                    <li>Applications sorted by activity, with real names, icons and a 30-second history</li>
+                    <li>A side panel for limits with presets, units and undo</li>
+                    <li>Limits are remembered and applied again on start</li>
+                    <li>Each application's connections, with hosts and services</li>
+                    <li>A new icon</li>
+                  </ul>
+                </description>
+              </release>
               <release version="2.0.1" date="2026-06-30">
                 <description>
                   <p>Initial flatpak release</p>
