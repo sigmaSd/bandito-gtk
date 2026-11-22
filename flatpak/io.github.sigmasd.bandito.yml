@@ -95,6 +95,18 @@ modules:
               <binary>bandito-gtk</binary>
             </provides>
             <releases>
+              <release version="3.1.0" date="2026-11-22">
+                <description>
+                  <p>Bandito now measures and limits traffic with netleash, one eBPF helper.</p>
+                  <ul>
+                    <li>IPv6 traffic is limited too</li>
+                    <li>Upload limits are paced instead of dropping packets</li>
+                    <li>Apps are named by their application ID, so names and icons match</li>
+                    <li>Less traffic shows up as unidentified</li>
+                    <li>A shorter password prompt, or none when netleash has its capabilities</li>
+                  </ul>
+                </description>
+              </release>
               <release version="3.0.2" date="2026-11-22">
                 <description>
                   <p>The window responds right away to new traffic and wakes the CPU less while idle, with jsGTK 0.72.</p>
