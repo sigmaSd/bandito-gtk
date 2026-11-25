@@ -108,3 +108,7 @@ The application relies on:
   `NETLEASH` points Bandito at another netleash binary: run as you if it has the
   capabilities, otherwise through `pkexec` as it is.
 - GTK4 libraries
+
+## License
+
+[MIT](LICENSE)
