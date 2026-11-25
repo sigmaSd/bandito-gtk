@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Bandito · see and limit each app's bandwidth on Linux</title>
+    <meta
+      name="description"
+      content="See how much every app on your Linux computer downloads and uploads, and limit any of them, or all of them at once."
+    />
+    <meta property="og:title" content="Bandito" />
+    <meta
+      property="og:description"
+      content="See how much every app on your Linux computer downloads and uploads, and limit any of them."
+    />
+    <meta property="og:image" content="https://sigmasd.github.io/bandito-gtk/assets/icon.png" />
+    <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="assets/icon.png" type="image/png" />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <main>
+      <nav>
+        <a class="brand" href="./"><img src="assets/icon.svg" alt="" width="48" height="48" /><strong>Bandito</strong></a>
+        <a href="#download">Download</a>
+        <a href="#how">How it works</a>
+        <a href="https://github.com/sigmaSd/bandito-gtk">Source</a>
+      </nav>
+
+      <header class="hero">
+        <p class="platform-tag"><span class="tag">Linux only</span></p>
+        <h1>Decide how much<br />each app gets.</h1>
+        <p class="lead">
+          Bandito shows how much every app on your Linux computer <span class="down">downloads</span> and
+          <span class="up">uploads</span>, and limits the ones that take too much.
+        </p>
+        <div class="buttons">
+          <a class="button" href="#download">Download</a>
+          <a class="button secondary" href="#how">How it works</a>
+        </div>
+      </header>
+
+      <figure class="shot">
+        <a href="assets/screenshots/main.webp"><img
+            src="assets/screenshots/main.webp"
+            width="1400"
+            height="1109"
+            alt="Bandito's window: total download and upload with a one-minute chart, and a list of apps with their rates. Steam is limited to 2.5 MB/s down and Syncthing to 500 KB/s up."
+        /></a>
+        <figcaption>
+          Every app's traffic, busiest first. Steam and Syncthing have a limit. Screenshots show simulated traffic.
+        </figcaption>
+      </figure>
+
+      <section class="features" aria-label="What Bandito does">
+        <div class="card">
+          <h2>See who is using it</h2>
+          <p>
+            Live download and upload for every app, with its real name and icon, and its last 30 seconds. Quiet apps
+            fold away.
+          </p>
+        </div>
+        <div class="card">
+          <h2>Limit any app</h2>
+          <p>
+            Download and upload separately, for one app or for all of them at once, over IPv4 and IPv6. Every change
+            can be undone.
+          </p>
+        </div>
+        <div class="card">
+          <h2>Set it once</h2>
+          <p>Limits are remembered for each app, and applied again the next time Bandito starts.</p>
+        </div>
+        <div class="card">
+          <h2>See where it goes</h2>
+          <p>Each app's panel lists the hosts it talked to in the last minute, with the service, port and rates.</p>
+        </div>
+      </section>
+
+      <section class="shots">
+        <figure>
+          <a href="assets/screenshots/limits.webp"><img
+              src="assets/screenshots/limits.webp"
+              width="1400"
+              height="1109"
+              loading="lazy"
+              alt="The panel for Steam: a 2.5 MB/s download limit, presets, and the hosts Steam is connected to"
+          /></a>
+          <figcaption>A limit on Steam, and its connections</figcaption>
+        </figure>
+        <figure>
+          <a href="assets/screenshots/unidentified-dark.webp"><img
+              src="assets/screenshots/unidentified-dark.webp"
+              width="1400"
+              height="1109"
+              loading="lazy"
+              alt="The panel for unidentified traffic in dark mode, with the likely reasons and its connections"
+          /></a>
+          <figcaption>Traffic no program claims, in dark mode</figcaption>
+        </figure>
+      </section>
+
+      <section id="download">
+        <h2>Download</h2>
+        <p class="muted">For Linux 5.12 or later, on Intel and AMD (x86_64) or 64-bit ARM (aarch64).</p>
+        <div id="downloads" class="downloads">
+          <div class="platform">
+            <h3>Linux</h3>
+            <div class="buttons">
+              <a class="button" href="https://github.com/sigmaSd/bandito-gtk/releases/latest">Latest release on GitHub</a>
+            </div>
+          </div>
+        </div>
+
+        <h3>Binary</h3>
+        <p>Needs GTK 4 and libadwaita, which GNOME desktops already have. Make it executable and run it:</p>
+        <pre><code>chmod +x bandito-gtk-x86_64
+./bandito-gtk-x86_64</code></pre>
+        <h3>Flatpak</h3>
+        <p>Brings its own GTK. The GNOME runtime it uses comes from Flathub.</p>
+        <pre><code>flatpak install --user bandito-gtk-x86_64.flatpak</code></pre>
+        <p class="fine">On 64-bit ARM, use <code>aarch64</code> in place of <code>x86_64</code>.</p>
+      </section>
+
+      <section id="how">
+        <h2>How it works</h2>
+        <p>
+          Bandito measures and limits traffic with <a href="https://github.com/sigmaSd/netleash">netleash</a>, a small
+          helper that counts each app's packets inside the Linux kernel, with eBPF. It leaves nothing running: when
+          Bandito closes, the limits are lifted until you open it again.
+        </p>
+        <h3>Why it asks for your password</h3>
+        <p>
+          Seeing and limiting other apps' traffic takes administrator access. Bandito downloads one exact version of
+          netleash and checks it, and checks it again as root before each run, so a changed file is never run. Only
+          netleash runs as root: the window doesn't.
+        </p>
+        <p>To skip the password, install netleash yourself and give it only the rights it needs, once:</p>
+        <pre><code>cargo install netleash
+sudo setcap cap_bpf,cap_net_admin,cap_perfmon+ep ~/.cargo/bin/netleash</code></pre>
+      </section>
+
+      <section id="limits">
+        <h2>Good to know</h2>
+        <ul>
+          <li>It watches one network at a time: you pick it on first run and switch from the header bar.</li>
+          <li>
+            Some traffic can't be matched to a program (containers, VPN tunnels, the system's own). It is shown with
+            its connections, but can't be limited.
+          </li>
+          <li>
+            Downloads are limited by dropping what is over the limit, so senders slow down; uploads are paced
+            instead.
+          </li>
+        </ul>
+      </section>
+
+      <footer>
+        <a href="https://github.com/sigmaSd/bandito-gtk">Source code</a> ·
+        <a href="https://github.com/sigmaSd/bandito-gtk/issues">Report a problem</a> ·
+        <a href="https://sigmasd.github.io/projects/">Other projects</a>
+      </footer>
+    </main>
+    <script src="downloads.js" defer></script>
+  </body>
+</html>

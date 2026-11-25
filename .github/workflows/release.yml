@@ -5,6 +5,10 @@ on:
     branches:
       - master
       - main
+    # The website is published by pages.yml: changing it is not a new build.
+    paths-ignore:
+      - "site/**"
+      - ".github/workflows/pages.yml"
 
 jobs:
   binary:
