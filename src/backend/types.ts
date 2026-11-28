@@ -5,8 +5,15 @@ import type { ConnectionSample, Sample } from "../model/store.ts";
 export type LimitTarget = { kind: "app"; name: string } | { kind: "global" };
 
 export interface BackendEvents {
-  /** One second of traffic per process and per connection. */
-  sample(samples: Sample[], connections: ConnectionSample[]): void;
+  /**
+   * One second of traffic per process and per connection, and the PIDs whose
+   * processes exited since the previous sample.
+   */
+  sample(
+    samples: Sample[],
+    connections: ConnectionSample[],
+    exited?: number[],
+  ): void;
   /** An app the backend can limit, seen even without traffic. */
   program(name: string): void;
   /** The monitor or shaper stopped unexpectedly. */

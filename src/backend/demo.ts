@@ -50,9 +50,27 @@ const PROCESSES: Record<string, [string, number, number][]> = {
   syncthing: [["syncthing", 1874, 1]],
 };
 
-function withProcesses(sample: Sample): Sample {
-  const processes = PROCESSES[sample.name];
+/**
+ * A curl in the demo terminal: it downloads for CURL_RUN of every CURL_CYCLE
+ * seconds, taking part of wget's share, with a new PID each time.
+ */
+const CURL_CYCLE = 20;
+const CURL_RUN = 8;
+const CURL_SHARE = 0.25;
+
+function curlPid(tick: number): number {
+  return 60000 + Math.floor(tick / CURL_CYCLE);
+}
+
+function withProcesses(sample: Sample, tick: number): Sample {
+  let processes = PROCESSES[sample.name];
   if (!processes) return sample;
+  if (sample.name === "org.gnome.Ptyxis" && tick % CURL_CYCLE < CURL_RUN) {
+    processes = processes.map(([name, pid, share]): [string, number, number] =>
+      name === "wget" ? [name, pid, share - CURL_SHARE] : [name, pid, share]
+    );
+    processes.push(["curl", curlPid(tick), CURL_SHARE]);
+  }
   return {
     ...sample,
     processes: processes.map(([name, pid, share]) => ({
@@ -132,17 +150,21 @@ export class DemoBackend implements Backend {
   }));
   #global: Limits = { download: null, upload: null };
   #timer: ReturnType<typeof setInterval> | null = null;
+  #ticks = 0;
 
   start(_iface: string, events: BackendEvents): Promise<void> {
     for (const app of this.#apps) events.program(app.name);
     this.#timer = setInterval(() => {
-      const samples = this.#tick();
-      events.sample(samples, spread(samples));
+      const tick = this.#ticks++;
+      const samples = this.#tick(tick);
+      // netleash reports an exit once the process's sockets went quiet.
+      const exited = tick % CURL_CYCLE === CURL_RUN + 1 ? [curlPid(tick)] : [];
+      events.sample(samples, spread(samples), exited);
     }, 1000);
     return Promise.resolve();
   }
 
-  #tick(): Sample[] {
+  #tick(tick: number): Sample[] {
     const samples: Sample[] = [];
     for (const app of this.#apps) {
       let down = 0;
@@ -178,7 +200,7 @@ export class DemoBackend implements Backend {
         for (const s of samples) s[key] *= factor;
       }
     }
-    return samples.map(withProcesses);
+    return samples.map((sample) => withProcesses(sample, tick));
   }
 
   switchInterface(_iface: string): Promise<void> {

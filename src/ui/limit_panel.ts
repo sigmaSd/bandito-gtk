@@ -220,7 +220,7 @@ const UNIDENTIFIED_HELP =
 function trafficRow(
   title: string,
   detail: string,
-  traffic: { download: Rate; upload: Rate; quietFor: number },
+  traffic: { download: Rate; upload: Rate; quietFor: number; exited?: boolean },
   bits: boolean,
 ): ListBoxRow {
   const row = new ListBoxRow();
@@ -251,6 +251,8 @@ function trafficRow(
       ? `↓ ${formatRate(traffic.download, bits)}\n↑ ${
         formatRate(traffic.upload, bits)
       }`
+      : traffic.exited
+      ? "Exited"
       : `Quiet ${traffic.quietFor} s`,
   );
   rate.setXalign(1);

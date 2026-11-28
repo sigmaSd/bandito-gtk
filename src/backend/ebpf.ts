@@ -21,6 +21,8 @@ export interface HelperSample {
     /** Sent by netleash after 0.2.1. */
     processTraffic?: { pid: number; name: string; rx: number; tx: number }[];
   }[];
+  /** PIDs from earlier processTraffic that exited (0.2.1 and earlier don't). */
+  exitedProcesses?: number[];
   connections: {
     app: string;
     protocol: string;
@@ -39,7 +41,7 @@ export interface HelperSample {
  */
 export function convert(
   sample: HelperSample,
-): { samples: Sample[]; connections: ConnectionSample[] } {
+): { samples: Sample[]; connections: ConnectionSample[]; exited: number[] } {
   const samples: Sample[] = sample.apps.map((app) => ({
     name: app.id,
     download: app.rx,
@@ -75,7 +77,7 @@ export function convert(
       download: c.rx,
       upload: c.tx,
     }));
-  return { samples, connections };
+  return { samples, connections, exited: sample.exitedProcesses ?? [] };
 }
 
 /** How Bandito runs netleash. */
@@ -219,8 +221,10 @@ export class EbpfBackend implements Backend {
         if (event.type === "ready") {
           markReady(true);
         } else if (event.type === "sample") {
-          const { samples, connections } = convert(event as HelperSample);
-          events.sample(samples, connections);
+          const { samples, connections, exited } = convert(
+            event as HelperSample,
+          );
+          events.sample(samples, connections, exited);
           for (const { name } of samples) {
             if (name !== UNKNOWN_PROCESS && !seen.has(name)) {
               seen.add(name);

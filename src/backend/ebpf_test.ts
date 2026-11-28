@@ -69,6 +69,17 @@ Deno.test("per-process traffic, from netleash after 0.2.1, is kept", () => {
   }]);
 });
 
+Deno.test("exited processes are passed on, and none from older netleash", () => {
+  const sample = {
+    interface: "wlan0",
+    total: { rx: 0, tx: 0 },
+    apps: [],
+    connections: [],
+  };
+  assertEquals(convert({ ...sample, exitedProcesses: [4100] }).exited, [4100]);
+  assertEquals(convert(sample).exited, []);
+});
+
 Deno.test("no unidentified sample when apps account for everything", () => {
   const { samples } = convert({
     interface: "wlan0",

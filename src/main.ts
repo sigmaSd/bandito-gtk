@@ -194,7 +194,8 @@ async function monitor(iface: NetInterface) {
   };
   try {
     await current.start(iface.name, {
-      sample: (samples, connections) => store.applySample(samples, connections),
+      sample: (samples, connections, exited) =>
+        store.applySample(samples, connections, exited),
       program: (name) => store.ensure(name),
       failure: (message) => fail(message),
     });

@@ -90,3 +90,27 @@ Deno.test("samples for the same app merge their processes", () => {
   ]);
   assertEquals(lines(store), [[10, "wget", 1200], [11, "git", 300]]);
 });
+
+Deno.test("an exited process leaves the list and is marked in the panel", () => {
+  const store = new Store();
+  store.applySample([app(2000, [[10, "wget", 1000], [11, "curl", 1000]])]);
+  store.applySample([app(1000, [[10, "wget", 1000]])], [], [11]);
+  assertEquals(lines(store), []);
+  const entry = store.apps.get("org.gnome.Ptyxis")!;
+  assertEquals(
+    store.recentProcesses(entry).map((p) => [p.pid, p.exited]),
+    [[10, false], [11, true]],
+  );
+});
+
+Deno.test("a reused PID with new traffic is no longer exited", () => {
+  const store = new Store();
+  store.applySample([app(1000, [[11, "curl", 1000]])]);
+  store.applySample([], [], [11]);
+  store.applySample([app(1000, [[11, "ssh", 1000]])]);
+  const entry = store.apps.get("org.gnome.Ptyxis")!;
+  assertEquals(
+    store.recentProcesses(entry).map((p) => [p.name, p.exited]),
+    [["ssh", false]],
+  );
+});

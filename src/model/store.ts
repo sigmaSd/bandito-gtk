@@ -37,6 +37,8 @@ export interface Sample {
 export interface ProcessInfo extends ProcessSample {
   /** Samples since this process last had traffic. */
   quietFor: number;
+  /** Whether netleash reported that the process exited. */
+  exited: boolean;
 }
 
 /** A line under an app in the list: a process, or the rest of its traffic. */
@@ -174,7 +176,7 @@ export class Store {
   processLines(entry: AppEntry): ProcessLine[] {
     if (!entry.hasProcesses) return [];
     const recent = this.recentProcesses(entry, Infinity)
-      .filter((p) => p.quietFor < PROCESS_LINGER);
+      .filter((p) => p.quietFor < PROCESS_LINGER && !p.exited);
     const lines: ProcessLine[] = recent.slice(0, LISTED_PROCESSES)
       .map(({ pid, name, download, upload }) => ({
         pid,
@@ -222,7 +224,7 @@ export class Store {
         info.download += p.download;
         info.upload += p.upload;
       } else {
-        entry.processes.set(p.pid, { ...p, quietFor: 0 });
+        entry.processes.set(p.pid, { ...p, quietFor: 0, exited: false });
       }
     }
     other.download = Math.max(0, sample.download - download);
@@ -262,8 +264,15 @@ export class Store {
     }
   }
 
-  /** Record one second of traffic. Apps missing from the sample had none. */
-  applySample(samples: Sample[], connections: ConnectionSample[] = []): void {
+  /**
+   * Record one second of traffic. Apps missing from the sample had none.
+   * `exited` lists PIDs whose processes have exited.
+   */
+  applySample(
+    samples: Sample[],
+    connections: ConnectionSample[] = [],
+    exited: number[] = [],
+  ): void {
     this.#applyConnections(connections);
     const seen = new Map<string, Sample>();
     for (const sample of samples) {
@@ -296,6 +305,10 @@ export class Store {
         ? 0
         : entry.quietFor + 1;
       this.#applyProcesses(entry, sample);
+      for (const pid of exited) {
+        const info = entry.processes.get(pid);
+        if (info) info.exited = true;
+      }
       download += entry.download;
       upload += entry.upload;
     }
