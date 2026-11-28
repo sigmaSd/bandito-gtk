@@ -95,6 +95,15 @@ modules:
               <binary>bandito-gtk</binary>
             </provides>
             <releases>
+              <release version="3.3.0" date="2026-11-28">
+                <description>
+                  <p>Bandito tells you when a newer version is out.</p>
+                  <ul>
+                    <li>On start, it asks GitHub for its releases and shows a banner with a Download button when one is newer</li>
+                    <li>"Check for updates" in the main menu turns it off</li>
+                  </ul>
+                </description>
+              </release>
               <release version="3.2.0" date="2026-11-28">
                 <description>
                   <p>Bandito shows each app's traffic by process, with netleash 0.3.0.</p>
