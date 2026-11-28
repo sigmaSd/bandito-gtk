@@ -33,6 +33,9 @@ bandwidth limits (download and upload), over IPv4 and IPv6, with
   from your installed applications.
 - **Automatic Setup:** Downloads and checks a pinned netleash in your XDG cache
   directory, or uses yours if it has its capabilities.
+- **Update Notice:** On start, Bandito asks GitHub whether a newer release is
+  out and offers it in a banner. Turn it off with "Check for updates" in the
+  main menu.
 - **Network Switching:** Pick the network on first run and switch from the
   header bar at any time.
 

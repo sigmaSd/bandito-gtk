@@ -20,6 +20,7 @@ import {
 } from "./model/settings.ts";
 import { Store } from "./model/store.ts";
 import { MainView } from "./ui/main_view.ts";
+import { findUpdate, type Release } from "./utils/updates.ts";
 import { errorPage, InterfacePage, SetupPage } from "./ui/setup_pages.ts";
 import {
   type BinaryName,
@@ -164,6 +165,17 @@ function chooseInterface(): Promise<NetInterface | null> {
   });
 }
 
+let update: Promise<Release | null> | null = null;
+
+/** Show a newer release on the view, asking GitHub once per start. */
+function offerUpdate(view: MainView) {
+  if (!settings.checkUpdates) return;
+  update ??= findUpdate(config.version);
+  update.then((release) => {
+    if (release && settings.checkUpdates) view.showUpdate(release);
+  });
+}
+
 async function monitor(iface: NetInterface) {
   const store = new Store();
   const current: Backend = NETLEASH
@@ -183,6 +195,7 @@ async function monitor(iface: NetInterface) {
     version: config.version,
   });
   window.setContent(view.widget);
+  offerUpdate(view);
 
   const fail = async (message: string) => {
     if (shuttingDown || backend !== current) return;

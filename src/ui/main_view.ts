@@ -40,6 +40,9 @@ import {
   SizeGroupMode,
   ToggleButton,
 } from "@sigmasd/gtk/gtk4";
+import { AppInfo } from "@sigmasd/gtk/gio";
+import { Banner } from "./banner.ts";
+import type { Release } from "../utils/updates.ts";
 import type { Backend, LimitTarget } from "../backend/types.ts";
 import { identify, type Identity } from "../model/identity.ts";
 import { type Limits, saveSettings, type Settings } from "../model/settings.ts";
@@ -97,6 +100,7 @@ export class MainView {
   #searchBar: SearchBar;
   #search: SearchEntry;
   #toasts: ToastOverlay;
+  #updateBanner: Banner;
   #split: OverlaySplitView;
   #panel: LimitPanel;
 
@@ -402,8 +406,12 @@ export class MainView {
     this.#toasts = new ToastOverlay();
     this.#toasts.setChild(this.#split);
 
+    this.#updateBanner = new Banner("");
+    this.#updateBanner.setButtonLabel("Download");
+
     this.widget = new ToolbarView();
     this.widget.addTopBar(header);
+    this.widget.addTopBar(this.#updateBanner);
     this.widget.addTopBar(this.#searchBar);
     this.widget.setContent(this.#toasts);
 
@@ -516,6 +524,16 @@ export class MainView {
       saveSettings(this.#opts.settings);
     });
     box.append(restore);
+
+    const updates = new CheckButton("Check for updates");
+    updates.setTooltipText("Ask GitHub for a newer Bandito when it starts");
+    updates.setActive(this.#opts.settings.checkUpdates);
+    updates.onToggled(() => {
+      this.#opts.settings.checkUpdates = updates.getActive();
+      saveSettings(this.#opts.settings);
+      if (!updates.getActive()) this.#updateBanner.setRevealed(false);
+    });
+    box.append(updates);
     box.append(new Separator(Orientation.HORIZONTAL));
 
     const item = (label: string, run: () => void) => {
@@ -927,6 +945,17 @@ export class MainView {
     this.#opts.backend.setLimits({ kind: "global" }, saved).catch((e) =>
       this.#toast(`Couldn't restore the limit for all apps: ${message(e)}`)
     );
+  }
+
+  /** Offer a newer release under the header bar. */
+  showUpdate(release: Release): void {
+    this.#updateBanner.setTitle(`Bandito ${release.version} is available`);
+    this.#updateBanner.onButtonClicked(() => {
+      AppInfo.launchDefaultForUriAsync(release.url).catch(() =>
+        this.#toast(`Couldn't open ${release.url}`)
+      );
+    });
+    this.#updateBanner.setRevealed(true);
   }
 
   #toast(title: string, undo?: () => void) {

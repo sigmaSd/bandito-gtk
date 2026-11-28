@@ -14,6 +14,8 @@ export interface Settings {
   /** Saved limits by program name. */
   limits: Record<string, Limits>;
   globalLimits: Limits;
+  /** Whether to ask GitHub for a newer Bandito on start. */
+  checkUpdates: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -22,6 +24,7 @@ const DEFAULTS: Settings = {
   restoreLimits: true,
   limits: {},
   globalLimits: { download: null, upload: null },
+  checkUpdates: true,
 };
 
 function configDir(): string {
@@ -56,6 +59,7 @@ export function loadSettings(): Settings {
       restoreLimits: raw.restoreLimits !== false,
       limits: saved,
       globalLimits: limits(raw.globalLimits),
+      checkUpdates: raw.checkUpdates !== false,
     };
   } catch {
     return structuredClone(DEFAULTS);
