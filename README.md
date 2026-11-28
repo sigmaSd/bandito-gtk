@@ -21,6 +21,9 @@ bandwidth limits (download and upload), over IPv4 and IPv6, with
 - **Connections:** Each app's panel lists the hosts it talked to in the last
   minute, with the service, port and rates. Traffic that can't be matched to a
   program is shown with its connections and the likely reasons.
+- **Processes:** When several processes in one app use the network, such as
+  programs started from a terminal, each gets its own line under the app, and
+  the app's panel lists them with their PIDs. Needs netleash 0.3.0 or later.
 - **Readable Units:** Rates and limits share one unit (KB/s and MB/s, or bits
   from the menu).
 - **Modern UI:** Built with GTK4 and libadwaita, with real app names and icons

@@ -32,19 +32,19 @@ export const HELPERS = {
   "netleash": {
     binaryName: "netleash",
     envVar: "NETLEASH",
-    version: "v0.2.1",
+    version: "v0.3.0",
     builds: {
       x86_64: {
         url:
-          "https://github.com/sigmaSd/netleash/releases/download/v0.2.1/netleash-x86_64",
+          "https://github.com/sigmaSd/netleash/releases/download/v0.3.0/netleash-x86_64",
         sha256:
-          "16db7d7660b99da16f3f340072140bc6a012b5eb32419c5e0deb4e84eb75594b",
+          "1c9e7a6515985f1be34c9b53e99525d33a217975ef82ab4a7e7720776d321d86",
       },
       aarch64: {
         url:
-          "https://github.com/sigmaSd/netleash/releases/download/v0.2.1/netleash-aarch64",
+          "https://github.com/sigmaSd/netleash/releases/download/v0.3.0/netleash-aarch64",
         sha256:
-          "16443991d1bf3f5a504a77557d12c84a7afec29dfb513699f8ab40863f68ecf3",
+          "f3607df4993e2a68874cc91139d48caa8fa2157cae6afc68d03f14c0c6d2f261",
       },
     },
   },
