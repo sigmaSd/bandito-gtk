@@ -1,6 +1,7 @@
 import {
   AboutDialog,
   type AdwApplicationWindow,
+  Banner,
   ButtonContent,
   Clamp,
   HeaderBar,
@@ -41,7 +42,6 @@ import {
   ToggleButton,
 } from "@sigmasd/gtk/gtk4";
 import { AppInfo } from "@sigmasd/gtk/gio";
-import { Banner } from "./banner.ts";
 import type { Release } from "../utils/updates.ts";
 import type { Backend, LimitTarget } from "../backend/types.ts";
 import { identify, type Identity } from "../model/identity.ts";
