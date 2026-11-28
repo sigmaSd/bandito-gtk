@@ -13,7 +13,14 @@ const AUTH_REFUSED = 126;
 export interface HelperSample {
   interface: string | null;
   total: { rx: number; tx: number };
-  apps: { id: string; kind: string; rx: number; tx: number }[];
+  apps: {
+    id: string;
+    kind: string;
+    rx: number;
+    tx: number;
+    /** Sent by netleash after 0.2.1. */
+    processTraffic?: { pid: number; name: string; rx: number; tx: number }[];
+  }[];
   connections: {
     app: string;
     protocol: string;
@@ -37,6 +44,14 @@ export function convert(
     name: app.id,
     download: app.rx,
     upload: app.tx,
+    ...app.processTraffic && {
+      processes: app.processTraffic.map((p) => ({
+        pid: p.pid,
+        name: p.name,
+        download: p.rx,
+        upload: p.tx,
+      })),
+    },
   }));
   const owned = sample.apps.reduce(
     (sum, app) => ({ rx: sum.rx + app.rx, tx: sum.tx + app.tx }),

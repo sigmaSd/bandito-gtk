@@ -58,6 +58,13 @@
 .app-title {
   font-weight: 600;
 }
+.process-line {
+  font-size: 9.5pt;
+}
+.rate.process-rate {
+  font-weight: 400;
+  font-size: 9.5pt;
+}
 .app-row.idle {
   opacity: 0.6;
 }

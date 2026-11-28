@@ -48,6 +48,27 @@ Deno.test("helper samples become app, unidentified and connection samples", () =
   }]);
 });
 
+Deno.test("per-process traffic, from netleash after 0.2.1, is kept", () => {
+  const { samples } = convert({
+    interface: "wlan0",
+    total: { rx: 100, tx: 10 },
+    apps: [{
+      id: "org.gnome.Ptyxis",
+      kind: "app",
+      rx: 100,
+      tx: 10,
+      processTraffic: [{ pid: 52107, name: "wget", rx: 90, tx: 10 }],
+    }],
+    connections: [],
+  });
+  assertEquals(samples, [{
+    name: "org.gnome.Ptyxis",
+    download: 100,
+    upload: 10,
+    processes: [{ pid: 52107, name: "wget", download: 90, upload: 10 }],
+  }]);
+});
+
 Deno.test("no unidentified sample when apps account for everything", () => {
   const { samples } = convert({
     interface: "wlan0",

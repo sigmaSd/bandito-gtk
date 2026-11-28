@@ -145,6 +145,7 @@ export class MainView {
     this.#rowContext = {
       bits: () => this.#opts.settings.showBits,
       colors: () => palette(this.#dark),
+      processLines: (entry) => this.#opts.store.processLines(entry),
       columns: {
         spark: new SizeGroup(SizeGroupMode.HORIZONTAL),
         download: new SizeGroup(SizeGroupMode.HORIZONTAL),
@@ -816,7 +817,10 @@ export class MainView {
     const entry = this.#opts.store.apps.get(key);
     if (entry) {
       this.#panel.updateConnections(this.#opts.store.recentConnections(entry));
-    }
+      this.#panel.updateProcesses(
+        entry.hasProcesses ? this.#opts.store.recentProcesses(entry) : null,
+      );
+    } else this.#panel.updateProcesses(null);
   }
 
   #setDirection(direction: Direction, value: Rate | null) {

@@ -19,6 +19,13 @@ interface DemoApp {
 
 const APPS: Omit<DemoApp, "current" | "limits">[] = [
   { name: "steam", download: 4.4e6, upload: 28e3, burst: 0.05, blip: 0 },
+  {
+    name: "org.gnome.Ptyxis",
+    download: 1.6e6,
+    upload: 90e3,
+    burst: 0.1,
+    blip: 0,
+  },
   { name: "firefox", download: 620e3, upload: 34e3, burst: 0.25, blip: 0 },
   { name: "syncthing", download: 60e3, upload: 880e3, burst: 0.1, blip: 0 },
   { name: "chrome", download: 140e3, upload: 12e3, burst: 0.3, blip: 0 },
@@ -31,6 +38,31 @@ const APPS: Omit<DemoApp, "current" | "limits">[] = [
   { name: "curl", download: 0, upload: 0, burst: 0, blip: 0.02 },
   { name: "flatpak", download: 0, upload: 0, burst: 0, blip: 0.01 },
 ];
+
+/**
+ * Processes splitting an app's simulated traffic, as netleash reports them:
+ * name, PID and share. What the shares leave over has no known process.
+ */
+const PROCESSES: Record<string, [string, number, number][]> = {
+  steam: [["steam", 4120, 1]],
+  firefox: [["firefox", 3311, 1]],
+  "org.gnome.Ptyxis": [["wget", 52107, 0.8], ["git", 52230, 0.15]],
+  syncthing: [["syncthing", 1874, 1]],
+};
+
+function withProcesses(sample: Sample): Sample {
+  const processes = PROCESSES[sample.name];
+  if (!processes) return sample;
+  return {
+    ...sample,
+    processes: processes.map(([name, pid, share]) => ({
+      pid,
+      name,
+      download: Math.round(sample.download * share),
+      upload: Math.round(sample.upload * share),
+    })),
+  };
+}
 
 /** Where each app's simulated traffic goes: host, port and protocol. */
 const ENDPOINTS: Record<string, [string, number, "tcp" | "udp"][]> = {
@@ -56,6 +88,10 @@ const ENDPOINTS: Record<string, [string, number, "tcp" | "udp"][]> = {
     ["fe80::1", 53, "udp"],
   ],
   opencode: [["api.anthropic.com", 443, "tcp"]],
+  "org.gnome.Ptyxis": [
+    ["download.fedoraproject.org", 443, "tcp"],
+    ["github.com", 443, "tcp"],
+  ],
   NetworkManager: [["connectivity-check.ubuntu.com", 80, "tcp"]],
   gh: [["api.github.com", 443, "tcp"]],
   "gnome-software": [["dl.flathub.org", 443, "tcp"]],
@@ -142,7 +178,7 @@ export class DemoBackend implements Backend {
         for (const s of samples) s[key] *= factor;
       }
     }
-    return samples;
+    return samples.map(withProcesses);
   }
 
   switchInterface(_iface: string): Promise<void> {

@@ -16,7 +16,11 @@ import {
 } from "@sigmasd/gtk/gtk4";
 import type { Identity } from "../model/identity.ts";
 import type { Limits } from "../model/settings.ts";
-import { type ConnectionInfo, hasLimit } from "../model/store.ts";
+import {
+  type ConnectionInfo,
+  hasLimit,
+  type ProcessInfo,
+} from "../model/store.ts";
 import { serviceName } from "../model/ports.ts";
 import {
   formatLimit,
@@ -212,6 +216,72 @@ const UNIDENTIFIED_HELP =
   "•  System traffic such as local discovery, DHCP or a VPN tunnel\n\n" +
   "The connections below show where it's going.";
 
+/** A row in the panel's lists: what it is, a detail line, and its rates. */
+function trafficRow(
+  title: string,
+  detail: string,
+  traffic: { download: Rate; upload: Rate; quietFor: number },
+  bits: boolean,
+): ListBoxRow {
+  const row = new ListBoxRow();
+  row.setActivatable(false);
+  const box = new Box(Orientation.HORIZONTAL, 12);
+  box.setMarginTop(8);
+  box.setMarginBottom(8);
+  box.setMarginStart(12);
+  box.setMarginEnd(12);
+  const text = new Box(Orientation.VERTICAL, 0);
+  text.setHexpand(true);
+  const name = new Label(title);
+  name.setXalign(0);
+  name.setEllipsize(2);
+  name.setSelectable(true);
+  name.setCanTarget(false);
+  const sub = new Label(detail);
+  sub.setXalign(0);
+  sub.setEllipsize(3);
+  sub.addCssClass("caption");
+  sub.addCssClass("dim-label");
+  text.append(name);
+  text.append(sub);
+  box.append(text);
+  const active = traffic.download + traffic.upload > 0;
+  const rate = new Label(
+    active
+      ? `↓ ${formatRate(traffic.download, bits)}\n↑ ${
+        formatRate(traffic.upload, bits)
+      }`
+      : `Quiet ${traffic.quietFor} s`,
+  );
+  rate.setXalign(1);
+  rate.addCssClass("caption");
+  rate.addCssClass("numeric");
+  if (!active) rate.addCssClass("dim-label");
+  box.append(rate);
+  row.setChild(box);
+  return row;
+}
+
+/** A titled boxed list, for the panel's processes and connections. */
+function trafficList(title: string, empty: string) {
+  const box = new Box(Orientation.VERTICAL, 6);
+  const heading = new Label(title);
+  heading.setXalign(0);
+  heading.setMarginStart(2);
+  heading.addCssClass("heading");
+  const list = new ListBox();
+  list.addCssClass("boxed-list");
+  list.setSelectionMode(SelectionMode.NONE);
+  const placeholder = new Label(empty);
+  placeholder.addCssClass("dim-label");
+  placeholder.setMarginTop(14);
+  placeholder.setMarginBottom(14);
+  list.setPlaceholder(placeholder);
+  box.append(heading);
+  box.append(list);
+  return { box, heading, list };
+}
+
 /** Sidebar for editing one target's download and upload limits. */
 export class LimitPanel {
   readonly widget: Box;
@@ -222,6 +292,11 @@ export class LimitPanel {
   #remember = new SwitchRow();
   #rememberGroup: PreferencesGroup;
   #footer: Box;
+  #processes: Box;
+  #processesTitle: Label;
+  #processList: ListBox;
+  /** Whether the target's traffic is split by process at all. */
+  #hasProcesses = false;
   #connections: Box;
   #connectionsTitle: Label;
   #connectionList: ListBox;
@@ -278,21 +353,23 @@ export class LimitPanel {
     this.#rememberGroup.add(this.#remember);
     content.append(this.#rememberGroup);
 
-    this.#connections = new Box(Orientation.VERTICAL, 6);
-    this.#connectionsTitle = new Label("Connections");
-    this.#connectionsTitle.setXalign(0);
-    this.#connectionsTitle.setMarginStart(2);
-    this.#connectionsTitle.addCssClass("heading");
-    this.#connectionList = new ListBox();
-    this.#connectionList.addCssClass("boxed-list");
-    this.#connectionList.setSelectionMode(SelectionMode.NONE);
-    const empty = new Label("No connections in the last minute");
-    empty.addCssClass("dim-label");
-    empty.setMarginTop(14);
-    empty.setMarginBottom(14);
-    this.#connectionList.setPlaceholder(empty);
-    this.#connections.append(this.#connectionsTitle);
-    this.#connections.append(this.#connectionList);
+    const processes = trafficList(
+      "Processes",
+      "No process traffic in the last minute",
+    );
+    this.#processes = processes.box;
+    this.#processesTitle = processes.heading;
+    this.#processList = processes.list;
+    this.#processes.setVisible(false);
+    content.append(this.#processes);
+
+    const connections = trafficList(
+      "Connections",
+      "No connections in the last minute",
+    );
+    this.#connections = connections.box;
+    this.#connectionsTitle = connections.heading;
+    this.#connectionList = connections.list;
     content.append(this.#connections);
 
     scroller.setChild(content);
@@ -339,6 +416,7 @@ export class LimitPanel {
       this.#rememberGroup.setVisible(identity.limitable);
       this.#footer.setVisible(identity.limitable);
       this.#connections.setVisible(!global);
+      this.#processes.setVisible(!global && this.#hasProcesses);
       this.#editors.download.sync(
         target.limits.download,
         target.download,
@@ -380,47 +458,41 @@ export class LimitPanel {
     );
     this.#connectionList.removeAll();
     for (const c of connections) {
-      const row = new ListBoxRow();
-      row.setActivatable(false);
-      const box = new Box(Orientation.HORIZONTAL, 12);
-      box.setMarginTop(8);
-      box.setMarginBottom(8);
-      box.setMarginStart(12);
-      box.setMarginEnd(12);
-      const text = new Box(Orientation.VERTICAL, 0);
-      text.setHexpand(true);
-      const host = new Label(c.host);
-      host.setXalign(0);
-      host.setEllipsize(2);
-      host.setSelectable(true);
-      host.setCanTarget(false);
       const service = serviceName(c.remotePort);
-      const detail = new Label(
+      const row = trafficRow(
+        c.host,
         `${service ? `${service} · ` : ""}port ${c.remotePort}/${c.protocol}`,
+        c,
+        bits,
       );
-      detail.setXalign(0);
-      detail.setEllipsize(3);
-      detail.addCssClass("caption");
-      detail.addCssClass("dim-label");
-      text.append(host);
-      text.append(detail);
-      box.append(text);
-      const active = c.download + c.upload > 0;
-      const rate = new Label(
-        active
-          ? `↓ ${formatRate(c.download, bits)}\n↑ ${formatRate(c.upload, bits)}`
-          : `Quiet ${c.quietFor} s`,
-      );
-      rate.setXalign(1);
-      rate.addCssClass("caption");
-      rate.addCssClass("numeric");
-      if (!active) rate.addCssClass("dim-label");
-      box.append(rate);
-      row.setChild(box);
       row.setTooltipText(
         `${c.host}:${c.remotePort} (${c.protocol}) from local port ${c.localPort}`,
       );
       this.#connectionList.append(row);
+    }
+  }
+
+  /**
+   * List the target's recent processes, busiest first; null hides the list,
+   * for netleash versions that don't split traffic by process.
+   */
+  updateProcesses(processes: ProcessInfo[] | null): void {
+    this.#hasProcesses = processes !== null;
+    this.#processes.setVisible(
+      processes !== null && this.#target?.name !== null,
+    );
+    if (processes === null) return;
+    const bits = this.actions.bits();
+    this.#processesTitle.setText(
+      processes.length ? `Processes · ${processes.length}` : "Processes",
+    );
+    this.#processList.removeAll();
+    for (const p of processes) {
+      const row = trafficRow(p.name, `PID ${p.pid}`, p, bits);
+      row.setTooltipText(
+        `Traffic of the connections ${p.name} (process ${p.pid}) opened`,
+      );
+      this.#processList.append(row);
     }
   }
 

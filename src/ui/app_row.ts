@@ -8,7 +8,12 @@ import {
   type SizeGroup,
 } from "@sigmasd/gtk/gtk4";
 import { identify, type Identity } from "../model/identity.ts";
-import { APP_HISTORY, type AppEntry, hasLimit } from "../model/store.ts";
+import {
+  APP_HISTORY,
+  type AppEntry,
+  hasLimit,
+  type ProcessLine,
+} from "../model/store.ts";
 import { formatLimit, formatRate } from "../model/units.ts";
 import { appIcon } from "./app_icon.ts";
 import { drawSparkline, type Palette } from "./charts.ts";
@@ -16,6 +21,8 @@ import { drawSparkline, type Palette } from "./charts.ts";
 export interface RowContext {
   bits(): boolean;
   colors(): Palette;
+  /** Lines to show under the app: its busiest processes. */
+  processLines(entry: AppEntry): ProcessLine[];
   /** Widths shared with the column headers. */
   columns: {
     spark: SizeGroup;
@@ -28,6 +35,64 @@ export interface RowContext {
 /** A rate this close to its limit means the app is being throttled. */
 const THROTTLED = 0.9;
 
+/** One process under its app: name, PID and rates, in the app's columns. */
+class ProcessLineView {
+  readonly widget = new Box(Orientation.HORIZONTAL, 12);
+  readonly #name = new Label("");
+  readonly #pid = new Label("");
+  readonly #download: Label;
+  readonly #upload: Label;
+
+  constructor(ctx: RowContext, rate: (cssClass: string) => Label) {
+    this.widget.setMarginStart(12);
+    this.widget.setMarginEnd(12);
+    this.widget.addCssClass("process-line");
+    const icon = new Box(Orientation.HORIZONTAL, 0);
+    icon.setSizeRequest(32, -1);
+    this.widget.append(icon);
+
+    const names = new Box(Orientation.HORIZONTAL, 6);
+    names.setHexpand(true);
+    this.#name.setXalign(0);
+    this.#name.setEllipsize(3);
+    this.#pid.setXalign(0);
+    this.#pid.addCssClass("caption");
+    this.#pid.addCssClass("dim-label");
+    this.#pid.addCssClass("numeric");
+    names.append(this.#name);
+    names.append(this.#pid);
+    this.widget.append(names);
+
+    const spark = new Box(Orientation.HORIZONTAL, 0);
+    ctx.columns.spark.addWidget(spark);
+    this.widget.append(spark);
+    this.#download = rate("rate-download");
+    ctx.columns.download.addWidget(this.#download);
+    this.widget.append(this.#download);
+    this.#upload = rate("rate-upload");
+    ctx.columns.upload.addWidget(this.#upload);
+    this.widget.append(this.#upload);
+    const limit = new Box(Orientation.HORIZONTAL, 0);
+    ctx.columns.limit.addWidget(limit);
+    this.widget.append(limit);
+  }
+
+  update(line: ProcessLine, setRate: (label: Label, rate: number) => void) {
+    this.#name.setText(line.name);
+    if (line.pid === null) this.#name.addCssClass("dim-label");
+    else this.#name.removeCssClass("dim-label");
+    this.#pid.setText(line.pid === null ? "" : `PID ${line.pid}`);
+    this.#pid.setVisible(line.pid !== null);
+    this.widget.setTooltipText(
+      line.pid === null
+        ? "Traffic from sockets Bandito can't tie to a process, such as ones opened before it started"
+        : `${line.name}, process ${line.pid}, which opened these connections`,
+    );
+    setRate(this.#download, line.download);
+    setRate(this.#upload, line.upload);
+  }
+}
+
 /** One program: icon, name, last 30 seconds, rates and its limits. */
 export class AppRow extends ListBoxRow {
   readonly entry: AppEntry;
@@ -38,6 +103,9 @@ export class AppRow extends ListBoxRow {
   #spark: DrawingArea;
   #limits: Box;
   #limitKey = "";
+  #main: Box;
+  #lines: Box;
+  #lineViews: ProcessLineView[] = [];
 
   constructor(entry: AppEntry, ctx: RowContext) {
     super();
@@ -100,12 +168,20 @@ export class AppRow extends ListBoxRow {
     ctx.columns.limit.addWidget(this.#limits);
     box.append(this.#limits);
 
-    this.setChild(box);
+    this.#main = box;
+    const content = new Box(Orientation.VERTICAL, 0);
+    content.append(box);
+    this.#lines = new Box(Orientation.VERTICAL, 2);
+    this.#lines.setMarginBottom(8);
+    this.#lines.setVisible(false);
+    content.append(this.#lines);
+    this.setChild(content);
     this.refresh();
   }
 
-  #rateLabel(cssClass: string): Label {
+  #rateLabel(cssClass: string, line = false): Label {
     const label = new Label("—");
+    if (line) label.addCssClass("process-rate");
     label.setXalign(1);
     label.setWidthChars(10);
     label.addCssClass("numeric");
@@ -126,6 +202,7 @@ export class AppRow extends ListBoxRow {
     this.#setRate(this.#download, entry.download);
     this.#setRate(this.#upload, entry.upload);
     this.#spark.queueDraw();
+    this.#refreshLines();
 
     const bits = this.#ctx.bits();
     const hotDown = entry.limits.download !== null &&
@@ -171,6 +248,26 @@ export class AppRow extends ListBoxRow {
       chip("↓", entry.limits.download, hotDown);
     }
     if (entry.limits.upload !== null) chip("↑", entry.limits.upload, hotUp);
+  }
+
+  /** Show the app's busiest processes under it, reusing the line widgets. */
+  #refreshLines() {
+    const lines = this.#ctx.processLines(this.entry);
+    while (this.#lineViews.length < lines.length) {
+      const view = new ProcessLineView(
+        this.#ctx,
+        (cssClass) => this.#rateLabel(cssClass, true),
+      );
+      this.#lineViews.push(view);
+      this.#lines.append(view.widget);
+    }
+    this.#lineViews.forEach((view, i) => {
+      const line = lines[i];
+      view.widget.setVisible(line !== undefined);
+      if (line) view.update(line, (label, rate) => this.#setRate(label, rate));
+    });
+    this.#lines.setVisible(lines.length > 0);
+    this.#main.setMarginBottom(lines.length > 0 ? 2 : 8);
   }
 
   setIdle(idle: boolean): void {
