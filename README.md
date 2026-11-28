@@ -31,8 +31,9 @@ bandwidth limits (download and upload), over IPv4 and IPv6, with
   from the menu).
 - **Modern UI:** Built with GTK4 and libadwaita, with real app names and icons
   from your installed applications.
-- **Automatic Setup:** Downloads and checks a pinned netleash in your XDG cache
-  directory, or uses yours if it has its capabilities.
+- **Automatic Setup:** Uses the netleash the `.rpm` or `.deb` installed, or
+  downloads and checks a pinned one in your XDG cache directory, or uses yours
+  if it has its capabilities.
 - **Update Notice:** On start, Bandito asks GitHub whether a newer release is
   out and offers it in a banner. Turn it off with "Check for updates" in the
   main menu.
@@ -40,6 +41,24 @@ bandwidth limits (download and upload), over IPv4 and IPv6, with
   header bar at any time.
 
 ## Installation
+
+### Fedora, Ubuntu and Debian
+
+Download the `.rpm` or `.deb` for your machine from the
+[latest release](https://github.com/sigmaSd/bandito-gtk/releases/latest) and
+install it. The packages add Bandito to your app menu with its icon, and include
+netleash, so nothing is downloaded when it starts. Administrators (`wheel` on
+Fedora, `sudo` on Ubuntu and Debian) at the machine aren't asked for a password,
+as with NetworkManager and firewalld; other users enter an administrator's
+password, remembered for a few minutes. They need libadwaita 1.5: Fedora 40,
+Ubuntu 24.04, Debian 13 or later.
+
+```bash
+sudo dnf install ./bandito-gtk-*.x86_64.rpm
+sudo apt install ./bandito-gtk_*_amd64.deb
+```
+
+They don't update themselves: Bandito shows a banner when a new version is out.
 
 ### Binary
 

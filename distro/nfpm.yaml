@@ -1,0 +1,71 @@
+# The .rpm and .deb packages, built from the compiled binary by release.yml
+# for each architecture (ARCH: amd64 or arm64):
+#
+#   VERSION=3.4.0 ARCH=amd64 BINARY=bandito-gtk-x86_64 NETLEASH=netleash-x86_64 \
+#     nfpm package -f distro/nfpm.yaml -p rpm -t dist/
+#
+# BINARY is `deno compile` output: never strip it (the app is appended to the
+# executable). NETLEASH is the pinned netleash Bandito would otherwise
+# download (src/utils/binary_manager.ts), installed root-owned without
+# capabilities and run through pkexec; the polkit policy names it, and its
+# rule lets administrators at the machine run it without a password.
+name: bandito-gtk
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+release: 1
+section: net
+priority: optional
+maintainer: sigmaSd <sigmaSd@users.noreply.github.com>
+vendor: sigmaSd
+homepage: https://github.com/sigmaSd/bandito-gtk
+license: MIT
+description: |-
+  Network bandwidth monitor and traffic shaper.
+  Bandito shows how much each application downloads and uploads, and limits
+  any of them, or all of them at once, over IPv4 and IPv6. It measures and
+  limits with netleash, which uses eBPF.
+
+contents:
+  - src: ${BINARY}
+    expand: true
+    dst: /usr/bin/bandito-gtk
+    file_info:
+      mode: 0755
+  - src: ${NETLEASH}
+    expand: true
+    dst: /usr/libexec/bandito-gtk/netleash
+    file_info:
+      mode: 0755
+  - src: distro/io.github.sigmasd.bandito.desktop
+    dst: /usr/share/applications/io.github.sigmasd.bandito.desktop
+  - src: distro/io.github.sigmasd.bandito.svg
+    dst: /usr/share/icons/hicolor/scalable/apps/io.github.sigmasd.bandito.svg
+  - src: distro/io.github.sigmasd.bandito.metainfo.xml
+    dst: /usr/share/metainfo/io.github.sigmasd.bandito.metainfo.xml
+  - src: distro/io.github.sigmasd.bandito.policy
+    dst: /usr/share/polkit-1/actions/io.github.sigmasd.bandito.policy
+  - src: distro/io.github.sigmasd.bandito.rules
+    dst: /usr/share/polkit-1/rules.d/io.github.sigmasd.bandito.rules
+  - src: LICENSE
+    dst: /usr/share/licenses/bandito-gtk/LICENSE
+    packager: rpm
+  - src: LICENSE
+    dst: /usr/share/doc/bandito-gtk/copyright
+    packager: deb
+
+overrides:
+  rpm:
+    depends:
+      - gtk4 >= 4.12
+      - libadwaita >= 1.5
+      - polkit
+  deb:
+    depends:
+      - libgtk-4-1 (>= 4.12)
+      - libadwaita-1-0 (>= 1.5)
+      - pkexec | policykit-1
+
+rpm:
+  summary: Network bandwidth monitor and traffic shaper
+  group: Applications/Internet

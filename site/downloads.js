@@ -10,8 +10,8 @@ const API = `https://api.github.com/repos/${REPO}`;
 const DOWNLOAD = `https://github.com/${REPO}/releases/download/`;
 
 const ARCHES = [
-  { id: "x86_64", name: "Intel and AMD", hint: "x86_64: most computers." },
-  { id: "aarch64", name: "64-bit ARM", hint: "aarch64: ARM laptops and boards." },
+  { id: "x86_64", deb: "amd64", name: "Intel and AMD", hint: "x86_64: most computers." },
+  { id: "aarch64", deb: "arm64", name: "64-bit ARM", hint: "aarch64: ARM laptops and boards." },
 ];
 
 async function api(path, accept = "application/vnd.github+json") {
@@ -52,11 +52,20 @@ async function main() {
   const files = [...ours(release), ...(await flatpaks(release.tag_name))];
   const blocks = [];
   for (const arch of ARCHES) {
+    // Packages first: they add the menu entry and icon, and bring netleash.
+    const rpm = files.find((a) => a.name.startsWith("bandito-gtk-") && a.name.endsWith(`.${arch.id}.rpm`));
+    const deb = files.find((a) => a.name.startsWith("bandito-gtk_") && a.name.endsWith(`_${arch.deb}.deb`));
     const flatpak = files.find((a) => a.name === `bandito-gtk-${arch.id}.flatpak`);
     const binary = files.find((a) => a.name === `bandito-gtk-${arch.id}`);
     const links = [];
-    if (flatpak) links.push(button(flatpak, "Flatpak", false));
-    if (binary) links.push(button(binary, "Binary", links.length > 0));
+    for (const [asset, label] of [
+      [rpm, "Fedora (.rpm)"],
+      [deb, "Ubuntu, Debian (.deb)"],
+      [flatpak, "Flatpak"],
+      [binary, "Binary"],
+    ]) {
+      if (asset) links.push(button(asset, label, links.length > 0));
+    }
     if (!links.length) continue;
     blocks.push(
       el(

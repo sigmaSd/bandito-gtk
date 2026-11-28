@@ -86,8 +86,16 @@ export type NetleashPlan =
   | { kind: "capable"; command: string[] }
   /** NETLEASH set to a binary without them: run it through pkexec. */
   | { kind: "override"; command: string[] }
+  /** The netleash the .rpm or .deb installed: run it through pkexec. */
+  | { kind: "packaged"; command: string[] }
   /** Download the pinned netleash, check it, run it as root via pkexec. */
   | { kind: "pinned" };
+
+/**
+ * Where the .rpm and .deb packages install netleash: root-owned, without
+ * capabilities, run through pkexec (their polkit policy names it).
+ */
+export const PACKAGED_NETLEASH = "/usr/libexec/bandito-gtk/netleash";
 
 /** Run a command on the host, outside the Flatpak sandbox if in one. */
 function onHost(args: string[]): string[] {
@@ -124,16 +132,20 @@ function onPath(): string | null {
 
 /**
  * How to run netleash. In order: NETLEASH; a netleash with its capabilities
- * on the PATH; otherwise the pinned download. A netleash without capabilities on the
- * PATH is never run through pkexec: it may sit in a user-writable directory
- * such as ~/.cargo/bin, which is why the pinned copy is checked as root
- * before it runs.
+ * on the PATH; the one the .rpm or .deb installed; otherwise the pinned
+ * download. A netleash without capabilities on the PATH is never run through
+ * pkexec: it may sit in a user-writable directory such as ~/.cargo/bin, which
+ * is why the pinned copy is checked as root before it runs. The packaged one
+ * is root-owned, so it runs as it is. The Flatpak never uses it: it may be an
+ * older package's.
  */
 export function chooseNetleash(options: {
   env?: string;
   path: string | null;
   capable: (path: string) => boolean;
   flatpak: boolean;
+  /** PACKAGED_NETLEASH when that file exists. */
+  packaged?: string | null;
 }): NetleashPlan {
   const host = (args: string[]) =>
     options.flatpak ? ["flatpak-spawn", "--host", ...args] : args;
@@ -145,7 +157,21 @@ export function chooseNetleash(options: {
   if (options.path && options.capable(options.path)) {
     return { kind: "capable", command: host([options.path]) };
   }
+  if (options.packaged && !options.flatpak) {
+    return options.capable(options.packaged)
+      ? { kind: "capable", command: [options.packaged] }
+      : { kind: "packaged", command: ["pkexec", options.packaged] };
+  }
   return { kind: "pinned" };
+}
+
+/** Whether a file exists and is executable, outside the sandbox or not. */
+function executable(path: string): boolean {
+  try {
+    return (Deno.statSync(path).mode ?? 0) & 0o111 ? true : false;
+  } catch {
+    return false;
+  }
 }
 
 /** chooseNetleash() for this machine. */
@@ -155,6 +181,7 @@ export function netleashPlan(): NetleashPlan {
     path: onPath(),
     capable,
     flatpak: isFlatpak(),
+    packaged: executable(PACKAGED_NETLEASH) ? PACKAGED_NETLEASH : null,
   });
 }
 

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.sigmasd.bandito</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="io.github.sigmasd">
+    <name>sigmaSd</name>
+  </developer>
+  <name>Bandito</name>
+  <summary>Network bandwidth monitor and traffic shaper</summary>
+  <description>
+    <p>
+      Bandito shows how much each application downloads and uploads, and lets you
+      limit any of them, or all of them at once, over IPv4 and IPv6. It measures and
+      limits with netleash, which uses eBPF.
+    </p>
+    <ul>
+      <li>Live rates and a short history for every application</li>
+      <li>Download and upload limits per application, remembered across restarts</li>
+      <li>The hosts and services each application is talking to</li>
+      <li>Switch between networks from the header bar</li>
+    </ul>
+  </description>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Traffic per application, with limits on two of them</caption>
+      <image>https://raw.githubusercontent.com/sigmaSd/bandito-gtk/3.0.0/distro/screenshots/main.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Limiting an application and seeing its connections</caption>
+      <image>https://raw.githubusercontent.com/sigmaSd/bandito-gtk/3.0.0/distro/screenshots/limits.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Traffic that couldn't be matched to a program, in dark mode</caption>
+      <image>https://raw.githubusercontent.com/sigmaSd/bandito-gtk/3.0.0/distro/screenshots/unidentified-dark.png</image>
+    </screenshot>
+  </screenshots>
+  <url type="homepage">https://github.com/sigmaSd/bandito-gtk</url>
+  <url type="bugtracker">https://github.com/sigmaSd/bandito-gtk/issues</url>
+  <launchable type="desktop-id">io.github.sigmasd.bandito.desktop</launchable>
+  <categories>
+    <category>System</category>
+    <category>Network</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <provides>
+    <binary>bandito-gtk</binary>
+  </provides>
+  <releases>
+    <release version="3.4.0" date="2026-11-28">
+      <description>
+        <p>Bandito is packaged as .rpm and .deb, with its menu entry and icon.</p>
+        <ul>
+          <li>The packages include netleash, so Bandito doesn't download it</li>
+          <li>With them, administrators at the machine aren't asked for a password, as with NetworkManager; other users enter an administrator's password</li>
+          <li>The menu entry is named Bandito</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.3.0" date="2026-11-28">
+      <description>
+        <p>Bandito tells you when a newer version is out.</p>
+        <ul>
+          <li>On start, it asks GitHub for its releases and shows a banner with a Download button when one is newer</li>
+          <li>"Check for updates" in the main menu turns it off</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.2.0" date="2026-11-28">
+      <description>
+        <p>Bandito shows each app's traffic by process, with netleash 0.3.0.</p>
+        <ul>
+          <li>When several processes in an app use the network, each gets a line under the app</li>
+          <li>The app's panel lists its processes, and marks the ones that exited</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.1.3" date="2026-11-22">
+      <description>
+        <p>Bandito starts a little faster, with jsGTK 0.75.</p>
+      </description>
+    </release>
+    <release version="3.1.2" date="2026-11-22">
+      <description>
+        <p>A Bandito binary for 64-bit ARM (aarch64) is released alongside the x86_64 one.</p>
+      </description>
+    </release>
+    <release version="3.1.1" date="2026-11-22">
+      <description>
+        <p>Bandito measures and limits traffic on 64-bit ARM (aarch64) too.</p>
+      </description>
+    </release>
+    <release version="3.1.0" date="2026-11-22">
+      <description>
+        <p>Bandito now measures and limits traffic with netleash, one eBPF helper.</p>
+        <ul>
+          <li>IPv6 traffic is limited too</li>
+          <li>Upload limits are paced instead of dropping packets</li>
+          <li>Apps are named by their application ID, so names and icons match</li>
+          <li>Less traffic shows up as unidentified</li>
+          <li>A shorter password prompt, or none when netleash has its capabilities</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.0.2" date="2026-11-22">
+      <description>
+        <p>The window responds right away to new traffic and wakes the CPU less while idle, with jsGTK 0.72.</p>
+      </description>
+    </release>
+    <release version="3.0.1" date="2026-11-22">
+      <description>
+        <p>The helper programs Bandito downloads are pinned to exact versions and checked before they run as root.</p>
+      </description>
+    </release>
+    <release version="3.0.0" date="2026-11-22">
+      <description>
+        <p>A redesign of the whole application.</p>
+        <ul>
+          <li>A summary of total traffic with a one-minute chart</li>
+          <li>Applications sorted by activity, with real names, icons and a 30-second history</li>
+          <li>A side panel for limits with presets, units and undo</li>
+          <li>Limits are remembered and applied again on start</li>
+          <li>Each application's connections, with hosts and services</li>
+          <li>A new icon</li>
+        </ul>
+      </description>
+    </release>
+    <release version="2.0.1" date="2026-06-30">
+      <description>
+        <p>Initial flatpak release</p>
+      </description>
+    </release>
+  </releases>
+</component>

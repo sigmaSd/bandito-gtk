@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { chooseNetleash, convert } from "./ebpf.ts";
+import { chooseNetleash, convert, PACKAGED_NETLEASH } from "./ebpf.ts";
 
 Deno.test("helper samples become app, unidentified and connection samples", () => {
   const { samples, connections } = convert({
@@ -133,4 +133,35 @@ Deno.test("NETLEASH overrides, through pkexec without capabilities", () => {
 Deno.test("otherwise the pinned download is used, in the Flatpak too", () => {
   assertEquals(plan({}), { kind: "pinned" });
   assertEquals(plan({ flatpak: true }), { kind: "pinned" });
+});
+
+Deno.test("the packaged netleash runs through pkexec", () => {
+  assertEquals(plan({ packaged: PACKAGED_NETLEASH }), {
+    kind: "packaged",
+    command: ["pkexec", PACKAGED_NETLEASH],
+  });
+});
+
+Deno.test("a capable netleash on the PATH comes before the packaged one", () => {
+  assertEquals(
+    plan({
+      path: "/usr/local/bin/netleash",
+      capable: (p) => p === "/usr/local/bin/netleash",
+      packaged: PACKAGED_NETLEASH,
+    }),
+    { kind: "capable", command: ["/usr/local/bin/netleash"] },
+  );
+});
+
+Deno.test("a packaged netleash given capabilities runs as the user", () => {
+  assertEquals(
+    plan({ packaged: PACKAGED_NETLEASH, capable: () => true }),
+    { kind: "capable", command: [PACKAGED_NETLEASH] },
+  );
+});
+
+Deno.test("the Flatpak ignores a packaged netleash on the host", () => {
+  assertEquals(plan({ packaged: PACKAGED_NETLEASH, flatpak: true }), {
+    kind: "pinned",
+  });
 });

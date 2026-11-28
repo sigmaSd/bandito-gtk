@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- Installed by the .rpm and .deb packages: names Bandito in the password
+     prompt when it runs its packaged netleash through pkexec. Administrators
+     at the machine aren't asked (io.github.sigmasd.bandito.rules); others
+     enter an administrator's password, remembered for a few minutes, like
+     NetworkManager's system-wide settings. -->
+<policyconfig>
+  <vendor>Bandito</vendor>
+  <vendor_url>https://github.com/sigmaSd/bandito-gtk</vendor_url>
+  <icon_name>io.github.sigmasd.bandito</icon_name>
+  <action id="io.github.sigmasd.bandito.netleash">
+    <description>Measure and limit network traffic per app</description>
+    <message>Bandito needs administrator access to measure and limit each app's network traffic</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/bandito-gtk/netleash</annotate>
+  </action>
+</policyconfig>

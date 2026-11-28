@@ -1,0 +1,17 @@
+// Installed by Bandito's .rpm and .deb packages.
+//
+// Administrators (wheel on Fedora, sudo on Ubuntu and Debian) in an active,
+// local session run Bandito's netleash without a password, as firewalld and
+// NetworkManager let them change the firewall and system-wide connections.
+// Everyone else, and remote or inactive sessions, are asked for an
+// administrator's password (io.github.sigmasd.bandito.policy).
+
+polkit.addRule(function (action, subject) {
+  if (
+    action.id == "io.github.sigmasd.bandito.netleash" &&
+    subject.active && subject.local &&
+    (subject.isInGroup("wheel") || subject.isInGroup("sudo"))
+  ) {
+    return polkit.Result.YES;
+  }
+});

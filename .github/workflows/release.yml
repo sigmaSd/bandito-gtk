@@ -51,6 +51,35 @@ jobs:
           # The name releases up to 3.1.1 used for the x86_64 binary.
           cp bandito-gtk-x86_64 bandito-gtk
 
+      # .rpm and .deb for both architectures (distro/nfpm.yaml), each with
+      # the netleash Bandito pins, checked against its SHA-256.
+      - name: Packages
+        if: steps.check_release.outputs.exists == 'false'
+        env:
+          NFPM_VERSION: 2.49.0
+          NFPM_SHA256: 2afaa5ffb5e3493402e31e7c67a5a1fb42133e3f66fc315ca0051934125561c7
+        run: |
+          curl -fsSLo nfpm.tar.gz "https://github.com/goreleaser/nfpm/releases/download/v$NFPM_VERSION/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz"
+          echo "$NFPM_SHA256  nfpm.tar.gz" | sha256sum -c -
+          tar -xzf nfpm.tar.gz nfpm
+          deno eval '
+            import { HELPERS } from "./src/utils/binary_manager.ts";
+            for (const [arch, build] of Object.entries(HELPERS.netleash.builds)) {
+              console.log(arch, build.url, build.sha256);
+            }' > netleash-pins.txt
+          mkdir -p dist
+          while read -r arch url sha256; do
+            curl -fsSLo "netleash-$arch" "$url"
+            echo "$sha256  netleash-$arch" | sha256sum -c -
+            case "$arch" in x86_64) pkg=amd64 ;; aarch64) pkg=arm64 ;; esac
+            for format in rpm deb; do
+              VERSION="${{ steps.get_version.outputs.VERSION }}" ARCH="$pkg" \
+                BINARY="bandito-gtk-$arch" NETLEASH="netleash-$arch" \
+                ./nfpm package -f distro/nfpm.yaml -p "$format" -t dist/
+            done
+          done < netleash-pins.txt
+          ls -l dist
+
       - name: Create Release
         if: steps.check_release.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
@@ -61,6 +90,8 @@ jobs:
             bandito-gtk
             bandito-gtk-x86_64
             bandito-gtk-aarch64
+            dist/*.rpm
+            dist/*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -112,6 +112,18 @@
           </div>
         </div>
 
+        <h3>Fedora, Ubuntu and Debian</h3>
+        <p>
+          The packages add Bandito to your app menu and bring netleash with them, so nothing is downloaded when it
+          starts, and administrators at the machine aren't asked for a password. They need libadwaita 1.5: Fedora
+          40, Ubuntu 24.04, Debian 13 or later.
+        </p>
+        <pre><code>sudo dnf install ./bandito-gtk-*.x86_64.rpm
+sudo apt install ./bandito-gtk_*_amd64.deb</code></pre>
+        <p class="fine">
+          They don't update themselves: Bandito shows a banner when a new version is out. On 64-bit ARM, use
+          <code>aarch64</code> or <code>arm64</code>.
+        </p>
         <h3>Binary</h3>
         <p>Needs GTK 4 and libadwaita, which GNOME desktops already have. Make it executable and run it:</p>
         <pre><code>chmod +x bandito-gtk-x86_64

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Bandito
+Comment=Network bandwidth monitor and traffic shaper
+Exec=bandito-gtk
+Icon=io.github.sigmasd.bandito
+Categories=Network;Monitor;
+StartupNotify=true
